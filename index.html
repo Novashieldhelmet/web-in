@@ -17,7 +17,7 @@
                     colors: {
                         brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' },
                         gold: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' },
-                        diamond: { : '#67e8f9', 500: '#06b6d4', 700: '#0e7490' },
+                        diamond: { 300: '#67e8f9', 500: '#06b6d4', 700: '#0e7490' },
                         wallet: { 50: '#ecfdf5', 100: '#d1fae5', 500: '#10b981', 600: '#059669', 700: '#047857' },
                         gacha: { 100: '#fce7f3', 500: '#ec4899', 600: '#db2777', 700: '#be185d' }
                     },
@@ -304,6 +304,16 @@
         .admin-control-grid { grid-template-columns: 1fr !important; }
     }
 
+
+    /* --- PERFORMANCE HOTFIX --- */
+    .hidden model-viewer { display: none !important; }
+    .view-section.hidden { display: none !important; }
+    #admin-orders-list, #user-orders-list, #admin-deposits-list, #admin-wallet-logs-list, #notification-list, #chat-messages, #admin-chat-messages { content-visibility: auto; contain-intrinsic-size: 1px 700px; }
+    .rank-fire-1::before, .rank-fire-1::after, .rank-fire-2::before, .rank-fire-2::after, .rank-fire-3 { animation-duration: 6s !important; }
+    @media (prefers-reduced-motion: reduce), (max-width: 768px) {
+        *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden">
@@ -431,7 +441,7 @@
                     <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div class="md:col-span-2 rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm">
                             <div class="text-xs font-black uppercase tracking-widest text-blue-500 mb-1"><i class="fa-solid fa-tags mr-1"></i> Bảng giá niêm yết</div>
-                            <div class="flex items-end gap-2"><span class="text-3xl font-black text-blue-700">300 đ</span><span class="font-bold text-slate-600 mb-1">/ tờ</span></div>
+                            <div class="flex items-end gap-2"><span class="text-3xl font-black text-blue-700">350 đ</span><span class="font-bold text-slate-600 mb-1">/ tờ</span></div>
                             <p class="text-xs text-slate-500 mt-2">Admin báo giá dựa trên số tờ thực tế, phí ship và voucher nếu có.</p>
                         </div>
                         <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 flex items-center gap-3">
@@ -549,9 +559,9 @@
                                     id="pet-3d-model" 
                                     src="" 
                                     animation-name="Idle" 
-                                    autoplay 
+                                    loading="lazy" 
+                                    reveal="interaction" 
                                     camera-controls 
-                                    auto-rotate 
                                     shadow-intensity="1" 
                                     class="w-full h-full opacity-25 absolute inset-0"
                                     style="background-color: transparent;"
@@ -1014,10 +1024,9 @@
             <button onclick="closePaymentModal()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
             <h3 class="text-lg md:text-xl font-extrabold mb-1 text-center text-slate-800">Thanh Toán Đơn Hàng</h3>
             <p id="pay-order-summary" class="text-center text-xs text-slate-500 mb-4">Chọn phương thức thanh toán</p>
-            <div class="grid grid-cols-3 gap-2 mb-5 bg-slate-100 p-1 rounded-2xl">
+            <div class="grid grid-cols-2 gap-2 mb-5 bg-slate-100 p-1 rounded-2xl">
                 <button onclick="setPaymentMethod('wallet')" id="btn-pay-wallet" class="py-2 rounded-xl font-bold text-xs md:text-sm bg-white shadow-sm text-emerald-600 transition"><i class="fa-solid fa-wallet"></i> Ví tiền</button>
-                <button onclick="setPaymentMethod('transfer')" id="btn-pay-transfer" class="py-2 rounded-xl font-bold text-xs md:text-sm text-slate-500 transition"><i class="fa-solid fa-qrcode"></i> QR</button>
-                <button onclick="setPaymentMethod('cod')" id="btn-pay-cod" class="py-2 rounded-xl font-bold text-xs md:text-sm text-slate-500 transition"><i class="fa-solid fa-truck"></i> COD</button>
+                <button onclick="setPaymentMethod('transfer')" id="btn-pay-transfer" class="py-2 rounded-xl font-bold text-xs md:text-sm text-slate-500 transition"><i class="fa-solid fa-qrcode"></i> QR chuyển khoản</button>
             </div>
 
             <div id="pay-content-wallet" class="text-center bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
@@ -1038,10 +1047,6 @@
                 <p class="text-[11px] text-yellow-700 bg-yellow-50 border border-yellow-100 rounded-xl p-2 mt-3">Sau khi bấm xác nhận, đơn sẽ chuyển sang trạng thái “chờ admin kiểm tra chuyển khoản”.</p>
             </div>
 
-            <div id="pay-content-cod" class="hidden text-center py-8 bg-slate-50 rounded-2xl border border-slate-100">
-                <i class="fa-solid fa-truck-fast text-5xl text-slate-300 mb-4"></i>
-                <p class="text-slate-700 font-medium text-sm">Thanh toán cho shipper khi nhận hàng.</p>
-            </div>
             <button onclick="confirmPayment()" id="btn-confirm-payment" class="w-full mt-5 bg-brand-600 text-white py-3 rounded-2xl font-extrabold hover:bg-brand-700 active:scale-95 transition">Xác nhận thanh toán</button>
         </div>
     </div>
@@ -1100,6 +1105,8 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
         let currentSessionRole = null;
         let activeChatUserId = null; 
         let userDataListener = null;
+        let userOrdersUnsub = null;
+        let adminOrdersUnsub = null;
         let miningInterval = null;
         let adminMiningUnsub = null;
         const MINING_CYCLE_MS = 30 * 60 * 1000;
@@ -1115,7 +1122,7 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
         let notificationDocsCache = [];
         let notificationInitialised = false;
         const BANK_INFO = { bin: "970436", accountNo: "1047262114", accountName: "TRAN NGUYEN PHU VINH", accountHolder: "Trần Nguyễn Phú Vinh", bankName: "VCB" };
-        const AUTO_QUOTE_CONFIG = { pricePerPage: 300, defaultShip: 15000, minPrint: 0, freeShipFrom: 150000 };
+        const AUTO_QUOTE_CONFIG = { pricePerPage: 350, defaultShip: 15000, minPrint: 0, freeShipFrom: 150000 };
 
         const GACHA_CONFIG_KEY = 'printshop_gacha_config_v3';
         const GACHA_WEEK_SPIN_AMOUNT = 5000;
@@ -1235,6 +1242,8 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
             return map[code] || e?.message || 'Không thể xác thực tài khoản.';
         }
         function resetRoleUI() {
+            if (userOrdersUnsub) { userOrdersUnsub(); userOrdersUnsub = null; }
+            if (adminOrdersUnsub) { adminOrdersUnsub(); adminOrdersUnsub = null; }
             document.getElementById('menu-admin-desktop')?.classList.add('hidden');
             document.getElementById('menu-user-desktop')?.classList.add('hidden');
             document.getElementById('chat-widget')?.classList.add('hidden');
@@ -1311,6 +1320,8 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                 resetRoleUI();
                 currentSessionRole = null;
                 if (userDataListener) { userDataListener(); userDataListener = null; }
+                if (userOrdersUnsub) { userOrdersUnsub(); userOrdersUnsub = null; }
+                if (adminOrdersUnsub) { adminOrdersUnsub(); adminOrdersUnsub = null; }
                 if (walletUnsub) { walletUnsub(); walletUnsub = null; }
                 if (walletLogUnsub) { walletLogUnsub(); walletLogUnsub = null; }
                 if (historyUnsub) { historyUnsub(); historyUnsub = null; }
@@ -2514,7 +2525,8 @@ window.handleAdminGift = async (e) => {
         };
         function initUserOrders(uid) {
             const q = query(collection(db, "orders"), where("userId", "==", uid), orderBy("createdAt", "desc"));
-            onSnapshot(q, (snap) => {
+            if (userOrdersUnsub) userOrdersUnsub();
+            userOrdersUnsub = onSnapshot(q, (snap) => {
                 const div = document.getElementById('user-orders-list');
                 div.innerHTML = "";
                 if (snap.empty) {
@@ -2528,41 +2540,69 @@ window.handleAdminGift = async (e) => {
                     if(o.status === 'pending_payment') { statusVi = 'Chờ TT'; statusColor = 'bg-yellow-100 text-yellow-700'; }
                     else if(o.status === 'payment_review') { statusVi = 'Đang kiểm tra CK'; statusColor = 'bg-orange-100 text-orange-700'; }
                     else if(o.status === 'paid') { statusVi = 'Đã TT'; statusColor = 'bg-green-100 text-green-700'; }
-                    else if(o.status === 'printing') { statusVi = 'COD/In'; statusColor = 'bg-blue-100 text-blue-700'; }
+                    else if(o.status === 'printing') { statusVi = 'Đang in'; statusColor = 'bg-blue-100 text-blue-700'; }
                     else if(o.status === 'delivered') { statusVi = 'Đã Giao'; statusColor = 'bg-purple-100 text-purple-700'; }
                     const payBtn = o.status === 'pending_payment' ? `<button onclick="openPaymentModal('${d.id}', ${Number(o.totalPrice || 0)})" class="bg-brand-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-700 animate-pulse">Thanh toán</button>` : '';
-                    const paymentInfo = o.paymentMethod ? `<p class="text-[10px] text-slate-400"><i class="fa-solid fa-credit-card mr-1"></i> ${o.paymentMethod === 'wallet' ? 'Ví tiền' : o.paymentMethod === 'transfer' ? 'Chuyển khoản QR' : 'COD'}</p>` : '';
+                    const paymentInfo = o.paymentMethod ? `<p class="text-[10px] text-slate-400"><i class="fa-solid fa-credit-card mr-1"></i> ${o.paymentMethod === 'wallet' ? 'Ví tiền' : o.paymentMethod === 'transfer' ? 'Chuyển khoản QR' : 'Không xác định'}</p>` : '';
                     div.innerHTML += `<div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition"><div class="flex justify-between items-center mb-1"><span class="font-bold text-slate-700 text-sm">#${d.id.slice(0,6)}</span><span class="text-[10px] font-bold px-2 py-1 rounded uppercase ${statusColor}">${statusVi}</span></div><div class="text-[10px] text-slate-400 mb-2 flex items-center gap-1"><i class="fa-regular fa-clock"></i> ${formatTime(o.createdAt)}</div><div class="text-xs text-slate-500 mb-3 space-y-1"><p class="truncate"><i class="fa-solid fa-link mr-1"></i> <a href="${sanitizeText(o.driveLink)}" target="_blank" class="text-blue-500 underline">Mở tài liệu</a></p><p class="truncate"><i class="fa-solid fa-note-sticky mr-1"></i> ${sanitizeText(o.userNote || '---')}</p>${o.adminNote ? `<p class="text-brand-600 font-medium mt-1 border-t border-dashed pt-1"><i class="fa-solid fa-reply mr-1"></i> Shop: ${sanitizeText(o.adminNote)}</p>` : ''}${paymentInfo}</div><div class="flex justify-between items-center pt-3 border-t border-slate-100"><span class="font-extrabold text-brand-600 text-base">${total}</span>${payBtn}</div></div>`;
                 });
             });
         }
         function initAdminOrders() {
+            if (!requireAdmin()) return;
+            if (adminOrdersUnsub) { adminOrdersUnsub(); adminOrdersUnsub = null; }
             const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
-            onSnapshot(q, (snap) => {
+            adminOrdersUnsub = onSnapshot(q, (snap) => {
                 const div = document.getElementById('admin-orders-list');
-                div.innerHTML = "";
+                if (!div) return;
                 if (snap.empty) {
                     div.innerHTML = '<div class="lg:col-span-2 bg-white p-8 rounded-2xl text-center text-slate-400 border border-slate-200">Chưa có đơn hàng.</div>';
                     return;
                 }
+                const html = [];
                 snap.forEach(d => {
                     const o = d.data();
                     const id = d.id;
-                    let statusBadge = `<span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px]">Mới</span>`;
+                    let statusBadge = `<span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold">Mới</span>`;
                     if(o.status === 'pending_payment') statusBadge = `<span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-[10px] font-bold">Chờ TT</span>`;
                     else if(o.status === 'payment_review') statusBadge = `<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold animate-pulse">Check CK</span>`;
                     else if(o.status === 'paid') statusBadge = `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">Đã TT</span>`;
-                    else if(o.status === 'printing') statusBadge = `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">COD/In</span>`;
+                    else if(o.status === 'printing') statusBadge = `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">Đang in</span>`;
                     else if(o.status === 'delivered') statusBadge = `<span class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold">Đã Giao</span>`;
                     const voucherDisplay = o.appliedCode ? `<span class="text-[10px] bg-pink-100 text-pink-600 px-1 rounded ml-1">${sanitizeText(o.appliedCode)}</span>` : '';
                     const showDeliverBtn = (o.status === 'paid' || o.status === 'printing');
-                    const checkPaymentBtn = o.status === 'payment_review' ? `<button onclick="adminApproveOrderPayment('${id}', '${o.userId}')" class="flex-1 h-[26px] bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700" title="Xác nhận đã nhận chuyển khoản"><i class="fa-solid fa-shield-check"></i></button>` : '';
-                    const reminderBtn = o.status === 'pending_payment' ? `<button onclick="adminNudgePayment('${id}', '${o.userId}')" class="flex-1 h-[26px] bg-yellow-500 text-white rounded font-bold hover:bg-yellow-600" title="Nhắc khách thanh toán"><i class="fa-solid fa-bell"></i></button>` : '';
+                    const checkPaymentBtn = o.status === 'payment_review' ? `<button onclick="adminApproveOrderPayment('${id}', '${o.userId}')" class="flex-1 min-w-[95px] h-[32px] bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 text-[11px]" title="Xác nhận đã nhận chuyển khoản"><i class="fa-solid fa-shield-check mr-1"></i>Đã nhận</button>` : '';
+                    const reminderBtn = o.status === 'pending_payment' ? `<button onclick="adminNudgePayment('${id}', '${o.userId}')" class="flex-1 min-w-[80px] h-[32px] bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 text-[11px]" title="Nhắc khách thanh toán"><i class="fa-solid fa-bell mr-1"></i>Nhắc</button>` : '';
                     const payContent = o.paymentContent ? `<div class="mt-1 text-[10px] bg-orange-50 text-orange-700 p-1 rounded border border-orange-100">ND CK: <b class="payment-code">${sanitizeText(o.paymentContent)}</b></div>` : '';
-                    div.innerHTML += `<div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-xs relative hover:shadow-md transition"><div class="flex justify-between items-start mb-3"><div><div class="font-bold text-slate-800 text-sm truncate max-w-[190px]">${sanitizeText((o.userEmail || 'unknown').split('@')[0])}</div><div class="text-[10px] text-slate-400">ID: ${id} ${voucherDisplay}</div>${payContent}</div><div class="text-right flex items-center gap-2">${statusBadge}<button onclick="handleDeleteOrder('${id}')" class="text-red-400 hover:text-red-600 p-1" title="Xóa đơn"><i class="fa-solid fa-trash"></i></button></div></div><div class="bg-slate-50 p-2 rounded-xl mb-2 border border-slate-100 space-y-1"><div class="flex gap-1"><i class="fa-brands fa-google-drive text-slate-400"></i> <a href="${sanitizeText(o.driveLink)}" target="_blank" class="text-blue-600 underline truncate">File khách</a></div><div class="flex gap-1"><i class="fa-solid fa-comment text-slate-400"></i> <span class="italic truncate">${sanitizeText(o.userNote || '')}</span></div><div class="mt-1"><input type="text" id="note-${id}" value="${sanitizeText(o.adminNote || '')}" class="w-full p-1 border border-dashed border-brand-300 rounded text-[11px] bg-brand-50 focus:bg-white transition" placeholder="Trả lời khách..."></div></div><div class="grid grid-cols-3 gap-2 items-end"><div><label class="block text-[10px] text-slate-400">In</label><input type="number" id="p-${id}" value="${o.printPrice || 0}" class="w-full p-1 border rounded bg-white"></div><div><label class="block text-[10px] text-slate-400">Ship</label><input type="number" id="s-${id}" value="${o.shipPrice || 0}" class="w-full p-1 border rounded bg-white"></div><div class="flex gap-1"><button onclick="autoFillQuote('${id}')" class="flex-1 h-[26px] bg-indigo-600 text-white rounded font-bold hover:bg-indigo-700" title="Báo giá nhanh"><i class="fa-solid fa-wand-magic-sparkles"></i></button><button onclick="adminUpdateQuote('${id}', '${sanitizeText(o.appliedCode || '')}')" class="flex-1 h-[26px] bg-brand-600 text-white rounded font-bold hover:bg-brand-700" title="Cập nhật giá & Ghi chú"><i class="fa-solid fa-check"></i></button>${checkPaymentBtn}${reminderBtn}${showDeliverBtn ? `<button onclick="adminMarkDelivered('${id}', '${o.userId}')" class="flex-1 h-[26px] bg-purple-600 text-white rounded font-bold hover:bg-purple-700" title="Báo đã giao & Cộng điểm"><i class="fa-solid fa-truck"></i></button>` : ''}</div></div></div>`;
+                    html.push(`<div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-xs relative hover:shadow-md transition">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <div class="font-bold text-slate-800 text-sm truncate max-w-[190px]">${sanitizeText((o.userEmail || 'unknown').split('@')[0])}</div>
+                                <div class="text-[10px] text-slate-400">ID: ${id} ${voucherDisplay}</div>${payContent}
+                            </div>
+                            <div class="text-right flex items-center gap-2">${statusBadge}<button onclick="handleDeleteOrder('${id}')" class="text-red-400 hover:text-red-600 p-1" title="Xóa đơn"><i class="fa-solid fa-trash"></i></button></div>
+                        </div>
+                        <div class="bg-slate-50 p-2 rounded-xl mb-2 border border-slate-100 space-y-1">
+                            <div class="flex gap-1"><i class="fa-brands fa-google-drive text-slate-400"></i> <a href="${sanitizeText(o.driveLink)}" target="_blank" class="text-blue-600 underline truncate">File khách</a></div>
+                            <div class="flex gap-1"><i class="fa-solid fa-comment text-slate-400"></i> <span class="italic truncate">${sanitizeText(o.userNote || '')}</span></div>
+                            <div class="mt-1"><input type="text" id="note-${id}" value="${sanitizeText(o.adminNote || '')}" class="w-full p-1 border border-dashed border-brand-300 rounded text-[11px] bg-brand-50 focus:bg-white transition" placeholder="Trả lời khách..."></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 items-end">
+                            <div><label class="block text-[10px] text-slate-400">Tiền in</label><input type="number" id="p-${id}" value="${o.printPrice || 0}" class="w-full p-2 border rounded bg-white font-bold"></div>
+                            <div><label class="block text-[10px] text-slate-400">Ship</label><input type="number" id="s-${id}" value="${o.shipPrice || 0}" class="w-full p-2 border rounded bg-white font-bold"></div>
+                        </div>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <button onclick="autoFillQuote('${id}')" class="flex-1 min-w-[110px] h-[34px] bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 text-[12px]" title="Báo giá nhanh"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Giá nhanh</button>
+                            <button onclick="adminUpdateQuote('${id}', '${sanitizeText(o.appliedCode || '')}')" class="flex-1 min-w-[120px] h-[34px] bg-brand-600 text-white rounded-lg font-extrabold hover:bg-brand-700 text-[12px]" title="Gửi báo giá cho khách"><i class="fa-solid fa-paper-plane mr-1"></i>Báo giá</button>
+                            ${checkPaymentBtn}${reminderBtn}
+                            ${showDeliverBtn ? `<button onclick="adminMarkDelivered('${id}', '${o.userId}')" class="flex-1 min-w-[105px] h-[34px] bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 text-[12px]" title="Báo đã giao & Cộng điểm"><i class="fa-solid fa-truck mr-1"></i>Đã giao</button>` : ''}
+                        </div>
+                    </div>`);
                 });
-            });
+                div.innerHTML = html.join('');
+            }, (error) => showToast('Lỗi tải đơn hàng: ' + error.message, 'error'));
         }
+
         window.adminUpdateQuote = async (id, codeString) => {
             if (!requireAdmin()) return;
             try {
@@ -2619,7 +2659,8 @@ window.handleAdminGift = async (e) => {
         window.closePaymentModal = () => document.getElementById('payment-modal').classList.add('hidden');
         window.setPaymentMethod = (m) => {
             paymentMethod = m;
-            ['wallet','transfer','cod'].forEach(method => {
+            if (!['wallet','transfer'].includes(m)) m = 'wallet';
+            ['wallet','transfer'].forEach(method => {
                 document.getElementById(`pay-content-${method}`)?.classList.toggle('hidden', m !== method);
                 const btn = document.getElementById(`btn-pay-${method}`);
                 if (btn) {
@@ -2627,7 +2668,6 @@ window.handleAdminGift = async (e) => {
                     btn.classList.toggle('shadow-sm', m === method);
                     btn.classList.toggle('text-emerald-600', method === 'wallet' && m === method);
                     btn.classList.toggle('text-brand-600', method === 'transfer' && m === method);
-                    btn.classList.toggle('text-blue-600', method === 'cod' && m === method);
                     btn.classList.toggle('text-slate-500', m !== method);
                 }
             });
@@ -2681,9 +2721,7 @@ window.handleAdminGift = async (e) => {
                     sendNotification('admin', `Khách ${currentUser.email} báo đã chuyển khoản đơn #${currentPaymentOrderId.slice(0,6)} với nội dung ${content}.`, { title: 'Cần kiểm tra chuyển khoản', type: 'payment_review', refId: currentPaymentOrderId });
                     showToast('Đã gửi yêu cầu kiểm tra chuyển khoản!');
                 } else {
-                    await updateDoc(orderRef, { status: 'printing', paymentMethod: 'cod', updatedAt: serverTimestamp() });
-                    sendNotification('admin', `Khách chọn COD cho đơn #${currentPaymentOrderId.slice(0,6)}.`, { title: 'Đơn COD mới', type: 'cod', refId: currentPaymentOrderId });
-                    showToast('Đã chọn thanh toán khi nhận hàng!');
+                    throw new Error('Phương thức thanh toán không hợp lệ. Chỉ hỗ trợ Ví tiền hoặc QR chuyển khoản.');
                 }
                 closePaymentModal();
             } catch (e) {
