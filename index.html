@@ -2916,44 +2916,77 @@ window.handleAdminGift = async (e) => {
             });
         }
 
-        window.approveDeposit = async (depositId) => {
+   window.approveDeposit = async (depositId) => {
             if (!requireAdmin()) return;
+            const btn = event?.currentTarget || event?.target; 
+            let oldText = "Duyệt & cộng ví";
+            if (btn && btn.tagName === 'BUTTON') {
+                oldText = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang kết nối...';
+                btn.disabled = true;
+            }
+
+            // HỆ THỐNG ÉP TIMEOUT CHỐNG TREO: Nếu 5s không xong -> Báo lỗi mạng
+            const withTimeout = (promise, ms, stepName) => {
+                let timeoutId;
+                const timeoutPromise = new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => reject(new Error(`Kết nối mạng bị chặn ở bước: [${stepName}].\nHãy tắt Adblock, uBlock hoặc dùng tab Ẩn danh để thử lại!`)), ms);
+                });
+                return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+            };
+
             try {
                 const depRef = doc(db, "deposits", depositId);
-                const depSnap = await getDoc(depRef);
-                if (!depSnap.exists()) return showToast('Không tìm thấy yêu cầu nạp', 'error');
+                
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
+                const depSnap = await withTimeout(getDoc(depRef), 5000, "Đọc dữ liệu máy chủ");
+                if (!depSnap.exists()) { showToast('Không tìm thấy đơn nạp', 'error'); return; }
                 const dep = depSnap.data();
-                if (dep.status !== 'pending') return showToast('Yêu cầu này đã được xử lý', 'error');
+
+                if (dep.status !== 'pending') { showToast('Đơn này đã xử lý rồi', 'error'); return; }
+
                 const amount = Number(dep.amount || 0);
                 const spinBonus = spinsFromAmount(amount);
-                const batch = writeBatch(db);
                 const userRef = doc(db, "users", dep.userId);
-                const logPayload = {
-                    userId: dep.userId,
-                    userEmail: dep.userEmail,
-                    depositId,
-                    paymentCode: dep.paymentCode,
-                    type: 'deposit',
-                    amount,
-                    delta: amount,
-                    direction: 'in',
-                    note: `Nạp tiền QR ${dep.paymentCode}${spinBonus > 0 ? ` • +${spinBonus} lượt Gacha` : ''}`,
-                    spinBonus,
-                    createdAt: serverTimestamp(),
-                    createdBy: currentUser?.email || ADMIN_EMAIL
-                };
-                batch.update(depRef, { status: 'approved', approvedAt: serverTimestamp(), approvedBy: currentUser?.email || ADMIN_EMAIL });
-                const userDepositUpdate = { balance: increment(amount), totalDeposited: increment(amount), walletUpdatedAt: serverTimestamp(), email: dep.userEmail };
-                if (spinBonus > 0) userDepositUpdate.spins = increment(spinBonus);
-                batch.set(userRef, userDepositUpdate, { merge: true });
-                batch.set(doc(collection(db, "users", dep.userId, "wallet_logs")), logPayload);
-                batch.set(doc(collection(db, "wallet_logs")), logPayload);
-                await batch.commit();
-                sendNotification(dep.userId, `Nạp ${fmtVND(amount)} thành công. Ví của bạn đã được cộng tiền${spinBonus > 0 ? ` và +${spinBonus} lượt Gacha` : ''}.`, { title: 'Nạp tiền thành công', type: 'deposit', refId: depositId });
-                showToast(`Đã duyệt nạp tiền, cộng ví${spinBonus > 0 ? ` và +${spinBonus} lượt Gacha` : ''}!`);
-            } catch (e) { showToast('Lỗi duyệt nạp: ' + e.message, 'error'); }
-        };
 
+                const safePaymentCode = String(dep.paymentCode || dep.transferContent || 'KHONG_CO_MA');
+                const safeUserEmail = String(dep.userEmail || 'Chưa cập nhật email');
+
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu ví...';
+                // LƯU TIỀN CHO USER
+                await withTimeout(setDoc(userRef, {
+                    balance: increment(amount),
+                    totalDeposited: increment(amount),
+                    spins: spinBonus > 0 ? increment(spinBonus) : increment(0),
+                    walletUpdatedAt: serverTimestamp(),
+                    email: safeUserEmail
+                }, { merge: true }), 5000, "Cộng tiền lên máy chủ");
+
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu log...';
+                // ĐỔI TRẠNG THÁI ĐƠN NẠP THÀNH CÔNG
+                await withTimeout(updateDoc(depRef, {
+                    status: 'approved',
+                    approvedAt: serverTimestamp(),
+                    approvedBy: String(currentUser?.email || ADMIN_EMAIL)
+                }), 5000, "Xác nhận duyệt đơn");
+
+                // Gửi thông báo
+                sendNotification(dep.userId, `Nạp ${fmtVND(amount)} thành công!`, { title: 'Nạp tiền thành công', type: 'deposit', refId: depositId });
+
+                showToast(`Thành công! Đã cộng ${fmtVND(amount)}`);
+
+            } catch (e) {
+                console.error("LỖI HỆ THỐNG:", e);
+                // Bật thẳng Alert để bắt buộc admin phải đọc lỗi
+                alert("LỖI XỬ LÝ:\n" + e.message); 
+            } finally {
+                // Trả lại nút bình thường dù thành công hay thất bại
+                if (btn && btn.tagName === 'BUTTON') {
+                    btn.innerHTML = oldText;
+                    btn.disabled = false;
+                }
+            }
+        };
         window.rejectDeposit = async (depositId) => {
             if (!requireAdmin()) return;
             const reason = prompt('Lý do từ chối yêu cầu nạp:', 'Chưa nhận được giao dịch hoặc sai nội dung chuyển khoản');
