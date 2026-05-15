@@ -1046,7 +1046,7 @@
    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDoc, setDoc, getDocs, writeBatch, increment, limit, deleteField, runTransaction} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { initializeFirestore , collection, addDoc, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDoc, setDoc, getDocs, writeBatch, increment, limit, deleteField, runTransaction} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
         // !!! CONFIG FIREBASE CỦA BẠN !!!
         const firebaseConfig = {
@@ -1063,7 +1063,7 @@ import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/fireb
         const auth = getAuth(app);
         const googleProvider = new GoogleAuthProvider();
         googleProvider.setCustomParameters({ prompt: "select_account" });
-        const db = getFirestore(app);
+        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 const messaging = (() => { try { return getMessaging(app); } catch (e) { console.warn('Firebase Messaging không khả dụng trong môi trường này:', e?.message || e); return null; } })();
 // --- HỆ THỐNG GỬI MAIL TỰ ĐỘNG BẰNG GOOGLE APPS SCRIPT ---
         // !!! QUAN TRỌNG: Thay link dưới đây bằng link Web App URL của ông !!!
@@ -1218,12 +1218,12 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
             navigator.clipboard?.writeText(text).then(() => showToast('Đã copy nội dung chuyển khoản')).catch(() => showToast('Không copy được, hãy copy thủ công', 'error'));
         };
 
-        window.setupPushNotification = async (user) => {
+       window.setupPushNotification = async (user) => {
             try {
                 if (!("Notification" in window)) return;
                 let permission = Notification.permission;
                 if (permission === "default") permission = await Notification.requestPermission();
-                await setDoc(doc(db, "users", user.uid), { notificationPermission: permission, lastSeenAt: serverTimestamp() }, { merge: true });
+                await setDoc(doc(db, "users", user.uid), { notificationPermission: permission }, { merge: true });
             } catch (err) {
                 console.warn('Không bật được thông báo trình duyệt:', err?.message || err);
             }
@@ -1300,35 +1300,25 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                     hasGoogleProvider,
                     hasPasswordProvider,
                     lastMiningTime: serverTimestamp(),
-                    miningTickets: 0,
-                    balance: 0,
-                    totalDeposited: 0,
-                    totalSpent: 0,
-                    points: 0,
-                    petFood: 0,
-                    evolutionStones: 0,
-                    membershipLevel: 0,
-                    weekScore: 0,
-                    monthScore: 0,
-                    spins: 0,
-                    lastGachaWeek: null,
-                    petSpecies: 0,
+                    miningTickets: 0, balance: 0, totalDeposited: 0, totalSpent: 0, points: 0, petFood: 0, evolutionStones: 0, membershipLevel: 0, weekScore: 0, monthScore: 0, spins: 0, lastGachaWeek: null, petSpecies: 0,
                     pet: { level: 1, currentXp: 0, form: 0 },
                     createdAt: serverTimestamp(),
-                    lastSeenAt: serverTimestamp()
-                }, { merge: true });
+                    lastSeenAt: serverTimestamp() 
+                });
             } else {
-                await setDoc(userRef, {
-                    email: user.email,
-                    displayName: snap.data().displayName || safeName,
-                    photoURL: snap.data().photoURL || user.photoURL || '',
-                    role: role === 'admin' ? 'admin' : (snap.data().role || 'member'),
-                    authProviders: providerIds,
-                    hasGoogleProvider,
-                    hasPasswordProvider,
-                    miningTickets: Math.max(0, Number(snap.data().miningTickets || 0)),
-                    lastSeenAt: serverTimestamp()
-                }, { merge: true });
+                const data = snap.data();
+                const updates = {};
+                if (data.displayName !== safeName && safeName !== 'User') updates.displayName = safeName;
+                if (data.photoURL !== user.photoURL && user.photoURL) updates.photoURL = user.photoURL;
+                if (!data.role) updates.role = role === 'admin' ? 'admin' : 'member';
+                
+                // CHỐNG SPAM WRITE: Chỉ cập nhật giờ online nếu đã trôi qua hơn 1 tiếng
+                const lastSeen = data.lastSeenAt ? (data.lastSeenAt.toMillis ? data.lastSeenAt.toMillis() : new Date(data.lastSeenAt).getTime()) : 0;
+                if (Date.now() - lastSeen > 3600000) updates.lastSeenAt = serverTimestamp();
+
+                if (Object.keys(updates).length > 0) {
+                    await updateDoc(userRef, updates);
+                }
             }
         }
         function requireAdmin() {
