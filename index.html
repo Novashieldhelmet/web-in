@@ -1084,6 +1084,27 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                 console.error("Lỗi khi gọi API gửi mail: ", e);
             }
         };
+        // --- HỆ THỐNG THÔNG BÁO CHO ADMIN QUA TELEGRAM ---
+        // !!! THAY TOKEN VÀ CHAT ID CỦA ÔNG VÀO ĐÂY !!!
+        const TELEGRAM_TOKEN = "8948907523:AAESta00e-4RTYLErY4UmXpoHlPvqQyrgaE"; 
+        const TELEGRAM_CHAT_ID = "8113060948";
+
+        window.sendTelegramAdmin = async (message) => {
+            try {
+                const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+                await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: TELEGRAM_CHAT_ID,
+                        text: message,
+                        parse_mode: 'HTML' 
+                    })
+                });
+            } catch (e) {
+                console.error("Lỗi gửi Telegram: ", e);
+            }
+        };
         // --- HÀM HỖ TRỢ NÉN ẢNH ---
         const resizeImage = (file, maxWidth = 300) => {
             return new Promise((resolve) => {
@@ -1418,9 +1439,8 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                 try {
                     const role = isAdminAccount(user) ? 'admin' : 'user';
                     currentSessionRole = role;
-                    await ensureUserProfileDoc(user, role);
-                    setupPushNotification(user);
-                    requestNotificationPermission();
+                    
+                    // 1. CHO HIỆN GIAO DIỆN & NÚT BẤM LÊN NGAY LẬP TỨC (KHÔNG CHỜ ĐỢI)
                     if (role === 'admin') {
                         document.getElementById('display-role-d').innerText = "Quản trị viên";
                         const roleM = document.getElementById('display-role-m'); if(roleM) roleM.innerText = "Admin";
@@ -1428,9 +1448,9 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                         document.getElementById('menu-user-desktop').classList.add('hidden');
                         document.getElementById('chat-widget').classList.add('hidden');
                         renderMobileNav('admin');
+                        switchTab('admin-automation'); // Mở tab lên ngay cho khỏi đơ
                         initAdminOrders(); initAdminVouchers(); initAdminGacha(); initAdminChatList(); initAdminUsers(); initAdminPayments(); initAutomationDashboard(); initAdminMining(); autoReminderSweep(false);
                         initNotificationListener('admin', user.uid);
-                        switchTab('admin-automation');
                     } else {
                         document.getElementById('display-role-d').innerText = "Thành viên";
                         const roleM = document.getElementById('display-role-m'); if(roleM) roleM.innerText = "Member";
@@ -1438,11 +1458,16 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                         document.getElementById('menu-admin-desktop').classList.add('hidden');
                         document.getElementById('chat-widget').classList.remove('hidden');
                         renderMobileNav('user');
+                        switchTab('user-home'); // Mở tab lên ngay cho khỏi đơ
                         initUserOrders(user.uid); initUserWallet(user.uid); initUserChat(user.uid); listenUserData(user.uid);
                         initNotificationListener('user', user.uid);
-                        switchTab('user-home');
                     }
-                } catch (err) { debugLog("Init Error: " + err.message); showToast('Lỗi khởi tạo: ' + err.message, 'error'); }
+
+                    // 2. CHẠY NGẦM ĐỒNG BỘ DỮ LIỆU Ở BACKGROUND SAU KHI UI ĐÃ HIỆN
+                    ensureUserProfileDoc(user, role).catch(e => console.warn("Lỗi đồng bộ hồ sơ:", e));
+                    setupPushNotification(user);
+                    requestNotificationPermission();
+                } catch (err) { debugLog("Init Error: " + err.message); showToast('Lỗi hiển thị giao diện: ' + err.message, 'error'); }
             } else {
                 currentSessionRole = null;
                 document.getElementById('auth-screen').classList.remove('hidden');
@@ -2530,7 +2555,14 @@ window.handleAdminGift = async (e) => {
                 sendNotification('admin', `Có đơn hàng mới #${orderRef.id.slice(0,6)} từ ${currentUser.displayName || currentUser.email}`, { title: 'Đơn hàng mới', type: 'order', refId: orderRef.id });
                 showToast("Đã gửi đơn!");
 
-                
+                // BÁO TELEGRAM CHO ADMIN (THÊM MỚI VÀO ĐÂY)
+                window.sendTelegramAdmin(
+                    `🚨 <b>CÓ ĐƠN ĐẶT IN MỚI!</b>\n` +
+                    `Khách: ${currentUser.displayName || currentUser.email}\n` +
+                    `Mã đơn: #${orderRef.id.slice(0,6)}\n` +
+                    `Ghi chú: ${orderPayload.userNote || 'Không có'}\n` +
+                    `<a href="${orderPayload.driveLink}">👉 Nhấn vào đây để xem file</a>`
+                );
                 // BẮN MAIL BÁO NHẬN ĐƠN CHO KHÁCH
                 window.sendMailAPI(
                     currentUser.email,
@@ -2548,6 +2580,7 @@ window.handleAdminGift = async (e) => {
                         <p style="font-size: 12px; color: #64748b; text-align: center;">Đây là email tự động, vui lòng không trả lời.</p>
                     </div>`
                 );
+
                 e.target.reset();
                 switchTab('user-orders');
             } catch (error) { showToast(error.message, 'error'); }
@@ -2808,6 +2841,14 @@ window.handleAdminGift = async (e) => {
                 document.getElementById('deposit-qr-card').classList.remove('hidden');
                 sendNotification('admin', `Có yêu cầu nạp ${fmtVND(amount)} từ ${currentUser.email}. Mã: ${paymentCode}`, { title: 'Yêu cầu nạp tiền mới', type: 'deposit', refId: paymentCode });
                 showToast('Đã tạo QR nạp tiền. Hãy chuyển đúng nội dung để admin duyệt nhanh.');
+                // BÁO TELEGRAM CHO ADMIN KHI CÓ ĐƠN NẠP VÍ (THÊM MỚI VÀO ĐÂY)
+                window.sendTelegramAdmin(
+                    `💰 <b>CÓ YÊU CẦU NẠP VÍ!</b>\n` +
+                    `Khách: ${currentUser.displayName || currentUser.email}\n` +
+                    `Số tiền: <b>${fmtVND(amount)}</b>\n` +
+                    `Mã nạp: <code>${content}</code>\n` +
+                    `Admin hãy check VCB và duyệt nhanh nhé!`
+                );
                 e.target.reset();
             } catch (err) { showToast('Lỗi tạo nạp tiền: ' + err.message, 'error'); }
         };
