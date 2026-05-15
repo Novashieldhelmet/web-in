@@ -1023,10 +1023,12 @@
         <div class="bg-white rounded-3xl p-5 w-full max-w-lg relative shadow-2xl overflow-hidden">
             <button onclick="closePaymentModal()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
             <h3 class="text-lg md:text-xl font-extrabold mb-1 text-center text-slate-800">Thanh Toán Đơn Hàng</h3>
-            <p id="pay-order-summary" class="text-center text-xs text-slate-500 mb-4">Chọn phương thức thanh toán</p>
-            <div class="grid grid-cols-2 gap-2 mb-5 bg-slate-100 p-1 rounded-2xl">
-                <button onclick="setPaymentMethod('wallet')" id="btn-pay-wallet" class="py-2 rounded-xl font-bold text-xs md:text-sm bg-white shadow-sm text-emerald-600 transition"><i class="fa-solid fa-wallet"></i> Ví tiền</button>
-                <button onclick="setPaymentMethod('transfer')" id="btn-pay-transfer" class="py-2 rounded-xl font-bold text-xs md:text-sm text-slate-500 transition"><i class="fa-solid fa-qrcode"></i> QR chuyển khoản</button>
+            <p id="pay-order-summary" class="text-center text-xs text-slate-500 mb-4">Thanh toán đơn hàng bằng ví tiền</p>
+            <div class="mb-5 bg-emerald-50 border border-emerald-100 p-3 rounded-2xl text-center">
+                <button type="button" onclick="setPaymentMethod('wallet')" id="btn-pay-wallet" class="w-full py-3 rounded-xl font-extrabold text-sm bg-white shadow-sm text-emerald-700 transition">
+                    <i class="fa-solid fa-wallet mr-1"></i> Chỉ thanh toán bằng ví tiền
+                </button>
+                <p class="mt-2 text-[11px] text-emerald-700">Chuyển khoản trực tiếp cho đơn hàng đã được tắt. Khách nạp tiền vào ví trước rồi thanh toán đơn bằng ví.</p>
             </div>
 
             <div id="pay-content-wallet" class="text-center bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
@@ -1036,17 +1038,6 @@
                 <p class="text-xs text-slate-500 mt-2">Bấm xác nhận để hệ thống tự động trừ tiền trong ví và chuyển đơn sang trạng thái đã thanh toán.</p>
                 <button onclick="switchTab('user-wallet'); closePaymentModal();" class="mt-3 text-xs font-bold text-emerald-700 underline">Nạp thêm tiền</button>
             </div>
-
-            <div id="pay-content-transfer" class="hidden text-center">
-                <img id="qr-image" src="" class="w-48 h-48 mx-auto border-2 border-brand-100 rounded-2xl mb-3 p-2 bg-white" alt="QR Code">
-                <p class="font-mono font-bold text-lg text-slate-800" id="qr-amount"></p>
-                <div class="text-xs text-slate-500 mt-2 bg-slate-50 rounded-xl p-3 border border-slate-100">
-                    <div>VCB - 1047262114 - Trần Nguyễn Phú Vinh</div>
-                    <div class="mt-1">Nội dung: <span id="qr-content" class="font-extrabold text-brand-600 select-all payment-code"></span> <button onclick="copyPaymentContent('qr-content')" class="ml-1 text-brand-600"><i class="fa-regular fa-copy"></i></button></div>
-                </div>
-                <p class="text-[11px] text-yellow-700 bg-yellow-50 border border-yellow-100 rounded-xl p-2 mt-3">Sau khi bấm xác nhận, đơn sẽ chuyển sang trạng thái “chờ admin kiểm tra chuyển khoản”.</p>
-            </div>
-
             <button onclick="confirmPayment()" id="btn-confirm-payment" class="w-full mt-5 bg-brand-600 text-white py-3 rounded-2xl font-extrabold hover:bg-brand-700 active:scale-95 transition">Xác nhận thanh toán</button>
         </div>
     </div>
@@ -2538,12 +2529,12 @@ window.handleAdminGift = async (e) => {
                     const total = fmtVND(o.totalPrice || 0);
                     let statusVi = 'Chờ báo giá', statusColor = 'bg-gray-100 text-gray-600';
                     if(o.status === 'pending_payment') { statusVi = 'Chờ TT'; statusColor = 'bg-yellow-100 text-yellow-700'; }
-                    else if(o.status === 'payment_review') { statusVi = 'Đang kiểm tra CK'; statusColor = 'bg-orange-100 text-orange-700'; }
+                    else if(o.status === 'payment_review') { statusVi = 'Chờ xử lý'; statusColor = 'bg-orange-100 text-orange-700'; }
                     else if(o.status === 'paid') { statusVi = 'Đã TT'; statusColor = 'bg-green-100 text-green-700'; }
                     else if(o.status === 'printing') { statusVi = 'Đang in'; statusColor = 'bg-blue-100 text-blue-700'; }
                     else if(o.status === 'delivered') { statusVi = 'Đã Giao'; statusColor = 'bg-purple-100 text-purple-700'; }
                     const payBtn = o.status === 'pending_payment' ? `<button onclick="openPaymentModal('${d.id}', ${Number(o.totalPrice || 0)})" class="bg-brand-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-700 animate-pulse">Thanh toán</button>` : '';
-                    const paymentInfo = o.paymentMethod ? `<p class="text-[10px] text-slate-400"><i class="fa-solid fa-credit-card mr-1"></i> ${o.paymentMethod === 'wallet' ? 'Ví tiền' : o.paymentMethod === 'transfer' ? 'Chuyển khoản QR' : 'Không xác định'}</p>` : '';
+                    const paymentInfo = o.paymentMethod ? `<p class="text-[10px] text-slate-400"><i class="fa-solid fa-credit-card mr-1"></i> ${o.paymentMethod === 'wallet' ? 'Ví tiền' : 'Thanh toán cũ'}</p>` : '';
                     div.innerHTML += `<div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition"><div class="flex justify-between items-center mb-1"><span class="font-bold text-slate-700 text-sm">#${d.id.slice(0,6)}</span><span class="text-[10px] font-bold px-2 py-1 rounded uppercase ${statusColor}">${statusVi}</span></div><div class="text-[10px] text-slate-400 mb-2 flex items-center gap-1"><i class="fa-regular fa-clock"></i> ${formatTime(o.createdAt)}</div><div class="text-xs text-slate-500 mb-3 space-y-1"><p class="truncate"><i class="fa-solid fa-link mr-1"></i> <a href="${sanitizeText(o.driveLink)}" target="_blank" class="text-blue-500 underline">Mở tài liệu</a></p><p class="truncate"><i class="fa-solid fa-note-sticky mr-1"></i> ${sanitizeText(o.userNote || '---')}</p>${o.adminNote ? `<p class="text-brand-600 font-medium mt-1 border-t border-dashed pt-1"><i class="fa-solid fa-reply mr-1"></i> Shop: ${sanitizeText(o.adminNote)}</p>` : ''}${paymentInfo}</div><div class="flex justify-between items-center pt-3 border-t border-slate-100"><span class="font-extrabold text-brand-600 text-base">${total}</span>${payBtn}</div></div>`;
                 });
             });
@@ -2565,13 +2556,13 @@ window.handleAdminGift = async (e) => {
                     const id = d.id;
                     let statusBadge = `<span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold">Mới</span>`;
                     if(o.status === 'pending_payment') statusBadge = `<span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-[10px] font-bold">Chờ TT</span>`;
-                    else if(o.status === 'payment_review') statusBadge = `<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold animate-pulse">Check CK</span>`;
+                    else if(o.status === 'payment_review') statusBadge = `<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold animate-pulse">Chờ xử lý</span>`;
                     else if(o.status === 'paid') statusBadge = `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">Đã TT</span>`;
                     else if(o.status === 'printing') statusBadge = `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">Đang in</span>`;
                     else if(o.status === 'delivered') statusBadge = `<span class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold">Đã Giao</span>`;
                     const voucherDisplay = o.appliedCode ? `<span class="text-[10px] bg-pink-100 text-pink-600 px-1 rounded ml-1">${sanitizeText(o.appliedCode)}</span>` : '';
                     const showDeliverBtn = (o.status === 'paid' || o.status === 'printing');
-                    const checkPaymentBtn = o.status === 'payment_review' ? `<button onclick="adminApproveOrderPayment('${id}', '${o.userId}')" class="flex-1 min-w-[95px] h-[32px] bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 text-[11px]" title="Xác nhận đã nhận chuyển khoản"><i class="fa-solid fa-shield-check mr-1"></i>Đã nhận</button>` : '';
+                    const checkPaymentBtn = o.status === 'payment_review' ? `<button onclick="adminApproveOrderPayment('${id}', '${o.userId}')" class="flex-1 min-w-[95px] h-[32px] bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 text-[11px]" title="Xác nhận thanh toán cũ"><i class="fa-solid fa-shield-check mr-1"></i>Đã nhận</button>` : '';
                     const reminderBtn = o.status === 'pending_payment' ? `<button onclick="adminNudgePayment('${id}', '${o.userId}')" class="flex-1 min-w-[80px] h-[32px] bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 text-[11px]" title="Nhắc khách thanh toán"><i class="fa-solid fa-bell mr-1"></i>Nhắc</button>` : '';
                     const payContent = o.paymentContent ? `<div class="mt-1 text-[10px] bg-orange-50 text-orange-700 p-1 rounded border border-orange-100">ND CK: <b class="payment-code">${sanitizeText(o.paymentContent)}</b></div>` : '';
                     html.push(`<div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-xs relative hover:shadow-md transition">
@@ -2647,30 +2638,21 @@ window.handleAdminGift = async (e) => {
         window.openPaymentModal = (id, amt) => {
             currentPaymentOrderId = id;
             currentPaymentAmount = Number(amt) || 0;
-            const content = transferContent(`DH${id.slice(0,6)}`, currentUser.email);
-            document.getElementById('qr-image').src = vietQrUrl(currentPaymentAmount, content);
-            document.getElementById('qr-amount').innerText = fmtVND(currentPaymentAmount);
-            document.getElementById('qr-content').innerText = content;
-            document.getElementById('pay-order-summary').innerText = `Đơn #${id.slice(0,6)} • ${fmtVND(currentPaymentAmount)}`;
+            paymentMethod = 'wallet';
+            document.getElementById('pay-order-summary').innerText = `Đơn #${id.slice(0,6)} • ${fmtVND(currentPaymentAmount)} • Thanh toán bằng ví`;
             document.getElementById('order-wallet-balance').innerText = fmtVND(currentWalletBalance);
             setPaymentMethod('wallet');
             document.getElementById('payment-modal').classList.remove('hidden');
         }
         window.closePaymentModal = () => document.getElementById('payment-modal').classList.add('hidden');
         window.setPaymentMethod = (m) => {
-            paymentMethod = m;
-            if (!['wallet','transfer'].includes(m)) m = 'wallet';
-            ['wallet','transfer'].forEach(method => {
-                document.getElementById(`pay-content-${method}`)?.classList.toggle('hidden', m !== method);
-                const btn = document.getElementById(`btn-pay-${method}`);
-                if (btn) {
-                    btn.classList.toggle('bg-white', m === method);
-                    btn.classList.toggle('shadow-sm', m === method);
-                    btn.classList.toggle('text-emerald-600', method === 'wallet' && m === method);
-                    btn.classList.toggle('text-brand-600', method === 'transfer' && m === method);
-                    btn.classList.toggle('text-slate-500', m !== method);
-                }
-            });
+            paymentMethod = 'wallet';
+            document.getElementById('pay-content-wallet')?.classList.remove('hidden');
+            const btn = document.getElementById('btn-pay-wallet');
+            if (btn) {
+                btn.classList.add('bg-white', 'shadow-sm', 'text-emerald-700');
+                btn.classList.remove('text-slate-500');
+            }
         }
         window.confirmPayment = async () => {
             if(!currentPaymentOrderId) return;
@@ -2680,49 +2662,40 @@ window.handleAdminGift = async (e) => {
             btn.innerText = 'Đang xử lý...';
             try {
                 const orderRef = doc(db, "orders", currentPaymentOrderId);
-                if (paymentMethod === 'wallet') {
-                    await runTransaction(db, async (transaction) => {
-                        const userRef = doc(db, "users", currentUser.uid);
-                        const userSnap = await transaction.get(userRef);
-                        const orderSnap = await transaction.get(orderRef);
-                        if (!userSnap.exists()) throw new Error('Không tìm thấy ví người dùng.');
-                        if (!orderSnap.exists()) throw new Error('Không tìm thấy đơn hàng.');
-                        const user = userSnap.data();
-                        const order = orderSnap.data();
-                        if (order.userId !== currentUser.uid) throw new Error('Bạn không có quyền thanh toán đơn này.');
-                        if (order.status !== 'pending_payment') throw new Error('Đơn này không còn ở trạng thái chờ thanh toán.');
-                        const amount = Number(order.totalPrice || 0);
-                        const balance = Number(user.balance || 0);
-                        if (amount <= 0) throw new Error('Số tiền đơn hàng chưa hợp lệ.');
-                        if (balance < amount) throw new Error(`Số dư ví không đủ. Thiếu ${fmtVND(amount - balance)}.`);
-                        const walletLogRef = doc(collection(db, "users", currentUser.uid, "wallet_logs"));
-                        const globalLogRef = doc(collection(db, "wallet_logs"));
-                        const payload = {
-                            userId: currentUser.uid,
-                            userEmail: currentUser.email,
-                            orderId: currentPaymentOrderId,
-                            type: 'order_payment',
-                            amount,
-                            delta: -amount,
-                            direction: 'out',
-                            note: `Thanh toán đơn #${currentPaymentOrderId.slice(0,6)} bằng ví`,
-                            createdAt: serverTimestamp()
-                        };
-                        transaction.update(userRef, { balance: balance - amount, totalSpent: increment(amount), walletUpdatedAt: serverTimestamp() });
-                        transaction.update(orderRef, { status: 'paid', paymentMethod: 'wallet', paidAt: serverTimestamp(), updatedAt: serverTimestamp() });
-                        transaction.set(walletLogRef, payload);
-                        transaction.set(globalLogRef, payload);
-                    });
-                    sendNotification('admin', `Đơn #${currentPaymentOrderId.slice(0,6)} đã được thanh toán bằng ví: ${fmtVND(currentPaymentAmount)}.`, { title: 'Đơn đã thanh toán', type: 'payment', refId: currentPaymentOrderId });
-                    showToast('Thanh toán bằng ví thành công!');
-                } else if (paymentMethod === 'transfer') {
-                    const content = document.getElementById('qr-content').innerText;
-                    await updateDoc(orderRef, { status: 'payment_review', paymentMethod: 'transfer', paymentContent: content, paymentSubmittedAt: serverTimestamp(), updatedAt: serverTimestamp() });
-                    sendNotification('admin', `Khách ${currentUser.email} báo đã chuyển khoản đơn #${currentPaymentOrderId.slice(0,6)} với nội dung ${content}.`, { title: 'Cần kiểm tra chuyển khoản', type: 'payment_review', refId: currentPaymentOrderId });
-                    showToast('Đã gửi yêu cầu kiểm tra chuyển khoản!');
-                } else {
-                    throw new Error('Phương thức thanh toán không hợp lệ. Chỉ hỗ trợ Ví tiền hoặc QR chuyển khoản.');
-                }
+                await runTransaction(db, async (transaction) => {
+                    const userRef = doc(db, "users", currentUser.uid);
+                    const userSnap = await transaction.get(userRef);
+                    const orderSnap = await transaction.get(orderRef);
+                    if (!userSnap.exists()) throw new Error('Không tìm thấy ví người dùng.');
+                    if (!orderSnap.exists()) throw new Error('Không tìm thấy đơn hàng.');
+                    const user = userSnap.data();
+                    const order = orderSnap.data();
+                    if (order.userId !== currentUser.uid) throw new Error('Bạn không có quyền thanh toán đơn này.');
+                    if (order.status !== 'pending_payment') throw new Error('Đơn này không còn ở trạng thái chờ thanh toán.');
+                    const amount = Number(order.totalPrice || 0);
+                    const balance = Number(user.balance || 0);
+                    if (amount <= 0) throw new Error('Số tiền đơn hàng chưa hợp lệ.');
+                    if (balance < amount) throw new Error(`Số dư ví không đủ. Thiếu ${fmtVND(amount - balance)}.`);
+                    const walletLogRef = doc(collection(db, "users", currentUser.uid, "wallet_logs"));
+                    const globalLogRef = doc(collection(db, "wallet_logs"));
+                    const payload = {
+                        userId: currentUser.uid,
+                        userEmail: currentUser.email,
+                        orderId: currentPaymentOrderId,
+                        type: 'order_payment',
+                        amount,
+                        delta: -amount,
+                        direction: 'out',
+                        note: `Thanh toán đơn #${currentPaymentOrderId.slice(0,6)} bằng ví`,
+                        createdAt: serverTimestamp()
+                    };
+                    transaction.update(userRef, { balance: balance - amount, totalSpent: increment(amount), walletUpdatedAt: serverTimestamp() });
+                    transaction.update(orderRef, { status: 'paid', paymentMethod: 'wallet', paidAt: serverTimestamp(), updatedAt: serverTimestamp() });
+                    transaction.set(walletLogRef, payload);
+                    transaction.set(globalLogRef, payload);
+                });
+                sendNotification('admin', `Đơn #${currentPaymentOrderId.slice(0,6)} đã được thanh toán bằng ví: ${fmtVND(currentPaymentAmount)}.`, { title: 'Đơn đã thanh toán', type: 'payment', refId: currentPaymentOrderId });
+                showToast('Thanh toán bằng ví thành công!');
                 closePaymentModal();
             } catch (e) {
                 showToast(e.message, 'error');
@@ -2934,7 +2907,7 @@ window.handleAdminGift = async (e) => {
                 const items = [];
                 state.deposits.filter(d => d.status === 'pending').slice(0, 5).forEach(d => items.push(`<div class="p-4 flex justify-between gap-3"><div><div class="font-bold text-slate-700">Duyệt nạp ${fmtVND(d.amount)}</div><div class="text-xs text-slate-500">${sanitizeText(d.userEmail)} • ${sanitizeText(d.paymentCode)}</div></div><button onclick="switchTab('admin-payments')" class="text-xs bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg font-bold">Xử lý</button></div>`));
                 state.orders.filter(o => o.status === 'pending_quote').slice(0, 5).forEach(o => items.push(`<div class="p-4 flex justify-between gap-3"><div><div class="font-bold text-slate-700">Đơn chờ báo giá #${o.id.slice(0,6)}</div><div class="text-xs text-slate-500">${sanitizeText(o.userEmail)}</div></div><button onclick="switchTab('admin-orders')" class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg font-bold">Báo giá</button></div>`));
-                state.orders.filter(o => o.status === 'payment_review').slice(0, 5).forEach(o => items.push(`<div class="p-4 flex justify-between gap-3"><div><div class="font-bold text-slate-700">Cần check chuyển khoản #${o.id.slice(0,6)}</div><div class="text-xs text-slate-500">${sanitizeText(o.paymentContent || o.userEmail)}</div></div><button onclick="switchTab('admin-orders')" class="text-xs bg-orange-50 text-orange-700 px-3 py-1 rounded-lg font-bold">Kiểm tra</button></div>`));
+                state.orders.filter(o => o.status === 'payment_review').slice(0, 5).forEach(o => items.push(`<div class="p-4 flex justify-between gap-3"><div><div class="font-bold text-slate-700">Cần xử lý thanh toán #${o.id.slice(0,6)}</div><div class="text-xs text-slate-500">${sanitizeText(o.paymentContent || o.userEmail)}</div></div><button onclick="switchTab('admin-orders')" class="text-xs bg-orange-50 text-orange-700 px-3 py-1 rounded-lg font-bold">Kiểm tra</button></div>`));
                 todo.innerHTML = items.length ? items.join('') : '<div class="p-8 text-center text-emerald-600 font-bold">Tuyệt vời! Không có việc gấp.</div>';
             };
             adminAutoUnsubs.push(onSnapshot(collection(db, "orders"), snap => { state.orders = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }));
@@ -2979,7 +2952,7 @@ window.handleAdminGift = async (e) => {
 - Doanh thu ví hôm nay: ${fmtVND(walletRevenue)}
 - Nạp đã duyệt lũy kế: ${fmtVND(approvedDeposit)}
 - Yêu cầu nạp chờ duyệt: ${pendingDeposit}
-- Đơn chuyển khoản chờ kiểm tra: ${transferReview}
+- Đơn thanh toán cũ chờ xử lý: ${transferReview}
 - Tổng số dư ví đang lưu hành: ${fmtVND(walletTotal)}
 Tài khoản nhận tiền: VCB ${BANK_INFO.accountNo} - ${BANK_INFO.accountHolder}`;
                 await navigator.clipboard?.writeText(report);
