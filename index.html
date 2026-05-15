@@ -269,9 +269,9 @@
     .ultimate-gacha-card { background: radial-gradient(circle at 18% 15%, rgba(251,191,36,.28), transparent 25%), radial-gradient(circle at 78% 20%, rgba(236,72,153,.26), transparent 30%), linear-gradient(145deg, #ffffff 0%, #fff7ed 48%, #fdf2f8 100%); border: 1px solid rgba(251,207,232,.75); box-shadow: 0 30px 90px rgba(219,39,119,.16); }
     .gacha-wheel-wrap { position: relative; isolation: isolate; }
     .gacha-wheel-wrap::before { content: ''; position: absolute; inset: -24px; border-radius: 999px; background: conic-gradient(from 0deg, rgba(251,191,36,.35), rgba(236,72,153,.28), rgba(59,130,246,.28), rgba(34,197,94,.22), rgba(251,191,36,.35)); filter: blur(24px); z-index: -1; opacity: .9; }
-    .gacha-wheel-canvas { position: relative; width: 100%; height: 100%; border-radius: 999px; overflow: hidden; border: 10px solid #fff; box-shadow: inset 0 0 0 3px rgba(255,255,255,.45), inset 0 0 28px rgba(15,23,42,.18), 0 28px 70px rgba(15,23,42,.22); transition: transform 4s cubic-bezier(.16, .82, .22, 1); background: conic-gradient(#f472b6 0deg 120deg, #fbbf24 120deg 240deg, #60a5fa 240deg 360deg); }
+    .gacha-wheel-canvas { position: relative; width: 100%; height: 100%; border-radius: 999px; overflow: hidden; border: 10px solid #fff; box-shadow: inset 0 0 0 3px rgba(255,255,255,.45), inset 0 0 28px rgba(15,23,42,.18), 0 28px 70px rgba(15,23,42,.22); transition: transform 4s cubic-bezier(.16, .82, .22, 1); background: conic-gradient(#f472b6 0deg 120deg, #fbbf24 120deg 240deg, #60a5fa 240deg 360deg); will-change: transform; transform: translateZ(0); backface-visibility: hidden; }
     .gacha-wheel-canvas::after { content: ''; position: absolute; inset: 14%; border-radius: 999px; background: radial-gradient(circle, rgba(255,255,255,.75), rgba(255,255,255,.16) 55%, transparent 62%); pointer-events: none; }
-    .gacha-segment-label { position: absolute; left: 50%; top: 50%; width: 106px; margin-left: -53px; margin-top: -14px; text-align: center; transform-origin: 50% 14px; transform: rotate(var(--a)) translateY(var(--r)) rotate(var(--t)); font-size: 11px; line-height: 1.05; font-weight: 900; color: #fff; text-shadow: 0 2px 8px rgba(15,23,42,.55), 0 0 2px rgba(15,23,42,.75); letter-spacing: -.01em; padding: 3px 5px; border-radius: 999px; background: rgba(15,23,42,.18); border: 1px solid rgba(255,255,255,.22); backdrop-filter: blur(2px); z-index: 2; }
+   .gacha-segment-label { position: absolute; left: 50%; top: 50%; width: 106px; margin-left: -53px; margin-top: -14px; text-align: center; transform-origin: 50% 14px; transform: rotate(var(--a)) translateY(var(--r)) rotate(var(--t)); font-size: 11px; line-height: 1.05; font-weight: 900; color: #fff; text-shadow: 0 2px 8px rgba(15,23,42,.55), 0 0 2px rgba(15,23,42,.75); letter-spacing: -.01em; padding: 3px 5px; border-radius: 999px; background: rgba(15,23,42,.4); border: 1px solid rgba(255,255,255,.3); z-index: 2; }
     .gacha-pointer { clip-path: polygon(50% 100%, 0 0, 100% 0); filter: drop-shadow(0 8px 10px rgba(15,23,42,.25)); }
     .gacha-chip { border: 1px solid rgba(226,232,240,.85); background: rgba(255,255,255,.82); box-shadow: 0 10px 26px rgba(15,23,42,.06); }
     .pet-orb { width: min(74vw, 280px); height: min(74vw, 280px); border-radius: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at 35% 20%, rgba(255,255,255,.36), transparent 25%), linear-gradient(145deg, rgba(30,41,59,.92), rgba(15,23,42,.9)); border: 1px solid rgba(255,255,255,.16); box-shadow: inset 0 0 40px rgba(255,255,255,.06), 0 28px 70px rgba(0,0,0,.34); transform-style: preserve-3d; animation: pet-bob 4s ease-in-out infinite; }
@@ -737,6 +737,14 @@
                                 <div class="w-full bg-white/75 rounded-3xl border border-white p-4 shadow-sm">
                                     <div class="flex justify-between items-center mb-3"><h3 class="font-black text-slate-800"><i class="fa-solid fa-list-ul text-pink-500"></i> Bảng phần thưởng</h3><span class="text-[10px] text-slate-400 font-bold">Tỉ lệ do admin cấu hình</span></div>
                                     <div id="gacha-prize-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs"></div>
+                                </div>
+                                <div class="w-full bg-white/75 rounded-3xl border border-white p-4 shadow-sm mt-4">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <h3 class="font-black text-slate-800"><i class="fa-solid fa-clock-rotate-left text-pink-500"></i> Lịch sử của bạn</h3>
+                                    </div>
+                                    <div id="gacha-history-list" class="max-h-[250px] overflow-y-auto space-y-2 text-xs pr-2">
+                                        <div class="text-center text-slate-400 py-4 italic">Đang tải...</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1386,7 +1394,7 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
             target.classList.remove('hidden');
             updateActiveNav(safeTab);
             if (safeTab === 'user-rank') loadLeaderboard('week');
-            if (safeTab === 'user-gacha') loadGachaItems().then(items => applyGachaWheel(items));
+          if (safeTab === 'user-gacha') { loadGachaItems().then(items => applyGachaWheel(items)); window.loadGachaHistory(); }
         };
         function updateActiveNav(tabId) { document.querySelectorAll('.nav-btn, .menu-item').forEach(btn => { if (btn.dataset?.tab === tabId || btn.getAttribute('onclick')?.includes(tabId)) { btn.classList.add('text-brand-600', 'bg-slate-50'); btn.classList.remove('text-slate-600', 'text-slate-400'); } else { btn.classList.remove('text-brand-600', 'bg-slate-50'); btn.classList.add('text-slate-600'); } }); }
         
@@ -3182,7 +3190,52 @@ function applyGachaWheel(items = gachaConfigCache, selectedIndex = -1) {
     renderGachaWheelTo('admin-gacha-wheel-preview', normalized, selectedIndex);
     renderGachaPrizeList(normalized);
 }
+let gachaHistoryUnsub = null;
+window.loadGachaHistory = () => {
+    if (gachaHistoryUnsub) gachaHistoryUnsub();
+    if (!currentUser) return;
+    const q = query(
+        collection(db, "users", currentUser.uid, "gacha_logs"),
+        orderBy("createdAt", "desc"),
+        limit(20)
+    );
+    gachaHistoryUnsub = onSnapshot(q, (snap) => {
+        const listEl = document.getElementById('gacha-history-list');
+        if (!listEl) return;
+        if (snap.empty) {
+            listEl.innerHTML = '<div class="text-center text-slate-400 py-4 italic">Chưa có lịch sử quay.</div>';
+            return;
+        }
+        let html = '';
+        snap.forEach(d => {
+            const item = d.data();
+            const timeStr = item.createdAt ? new Date(item.createdAt.toDate()).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'}) : 'Vừa xong';
+            let icon = '<i class="fa-solid fa-gift text-slate-400"></i>';
+            let colorClass = 'text-slate-600';
+            
+            if(item.type === 'point') { icon = '<i class="fa-solid fa-star text-yellow-500"></i>'; colorClass = 'text-yellow-600 font-bold'; }
+            if(item.type === 'exp') { icon = '<i class="fa-solid fa-dragon text-green-500"></i>'; colorClass = 'text-green-600 font-bold'; }
+            if(item.type === 'stone') { icon = '<i class="fa-solid fa-bolt text-purple-500"></i>'; colorClass = 'text-purple-600 font-bold'; }
+            if(item.type === 'voucher') { icon = '<i class="fa-solid fa-ticket text-pink-500"></i>'; colorClass = 'text-pink-600 font-bold'; }
+            
+            let codeHtml = item.code ? `<div class="mt-1 bg-pink-50 p-1.5 rounded text-[10px] font-mono flex justify-between items-center cursor-pointer border border-pink-100 hover:bg-pink-100 transition" onclick="navigator.clipboard.writeText('${item.code}'); showToast('Đã copy mã voucher')"><span class="text-pink-600 font-bold">${item.code}</span><i class="fa-regular fa-copy text-pink-400"></i></div>` : '';
 
+            html += `
+                <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm fade-in">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            ${icon}
+                            <span class="${colorClass} text-[11px]">${sanitizeText(item.reward)}</span>
+                        </div>
+                        <span class="text-[9px] text-slate-400 font-mono">${timeStr}</span>
+                    </div>
+                    ${codeHtml}
+                </div>
+            `;
+        });
+        listEl.innerHTML = html;
+    });
+};
 function updateGachaStatusFromUser(data = {}) {
     const weekKey = getWeekKey();
     const extra = Number(data.spins || 0);
