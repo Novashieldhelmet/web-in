@@ -1165,7 +1165,7 @@ import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/fireb
 const messaging = (() => { try { return getMessaging(app); } catch (e) { console.warn('Firebase Messaging không khả dụng trong môi trường này:', e?.message || e); return null; } })();
 // --- HỆ THỐNG GỬI MAIL TỰ ĐỘNG BẰNG GOOGLE APPS SCRIPT ---
         // !!! QUAN TRỌNG: Thay link dưới đây bằng link Web App URL của ông !!!
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyndMOT9AFeGdUsnDCjQTNXcVm4tJ338LC89CECRdqm1rcWPtZfCLIkZnppp_kPMHHGDA/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzr5A4yGM-s4uWi1AkEvHQbEoSEigfCY7BPTDXgHP1tJhGkzLRTlG_YNPLZYBphunjmAw/exec"; 
 
         window.sendMailAPI = async (toEmail, subject, htmlContent) => {
             try {
