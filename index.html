@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PrintShop Pro - Ultimate V2</title>
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -453,10 +454,46 @@
                         <i class="fa-solid fa-lightbulb mt-0.5"></i>
                         <div><span class="font-bold">Mẹo:</span> Giá in niêm yết 350 đ/tờ. 1 tờ in = 1 Điểm Hội Viên & 1 Thức ăn.<br>Nuôi Pet lớn để mở khóa hào quang & tiến hóa!</div>
                     </div>
-                    <form onsubmit="handleCreateOrder(event)" class="space-y-5">
-                        <div><label class="block text-sm font-medium text-slate-700 mb-1">Link Drive / Tài liệu <span class="text-red-500">*</span></label><input type="url" id="order-link" required class="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-brand-500 transition" placeholder="https://drive.google.com/..."></div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-slate-700 mb-1">Mã giảm giá</label><input type="text" id="order-voucher" class="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 uppercase" placeholder="SALE50"></div><div><label class="block text-sm font-medium text-slate-700 mb-1">Ghi chú</label><input type="text" id="order-note" class="w-full p-3 border border-slate-200 rounded-xl bg-slate-50" placeholder="VD: In 2 mặt, đóng bìa..."></div></div>
-                        <button type="submit" class="w-full bg-brand-600 text-white py-3.5 rounded-xl font-bold hover:bg-brand-700 shadow-lg shadow-brand-500/20 active:scale-95 transition">Gửi Yêu Cầu Báo Giá</button>
+                  <form onsubmit="handleCreateOrder(event)" class="space-y-5">
+                       <div class="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">1. Tải lên tài liệu (Khuyên dùng: PDF, DOCX)</label>
+                            <input type="file" id="order-file" accept=".pdf,.doc,.docx" class="w-full p-2 border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-brand-500 transition cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+                            
+                            <div class="flex items-center gap-3 my-4">
+                                <div class="h-px bg-slate-200 flex-1"></div>
+                                <span class="text-xs font-bold text-slate-400 uppercase">HOẶC DÁN LINK (NẾU FILE QUÁ NẶNG)</span>
+                                <div class="h-px bg-slate-200 flex-1"></div>
+                            </div>
+
+                            <label class="block text-sm font-medium text-slate-700 mb-2">2. Link Google Drive của bạn</label>
+                            <input type="url" id="order-drive-link" class="w-full p-3 border border-slate-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-brand-500" placeholder="https://drive.google.com/...">
+                            <p class="text-[10px] text-slate-500 mt-1 italic">* Lưu ý: Nếu dán link Drive, hệ thống không thể tự đếm trang, Admin sẽ kiểm tra file và báo giá thủ công.</p>
+                        </div>
+                        <div id="auto-quote-preview" class="hidden bg-blue-50 border border-blue-200 p-4 rounded-xl mt-3 text-sm text-blue-800 shadow-inner transition-all">
+                            <div class="flex justify-between items-center mb-2 border-b border-blue-200 pb-2">
+                                <span class="font-bold"><i class="fa-solid fa-file-lines"></i> Số trang ước tính:</span>
+                                <span id="preview-pages" class="font-black text-lg bg-blue-200 px-2 rounded">0</span>
+                            </div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-bold text-slate-600">Tiền in:</span>
+                                <span id="preview-print-price" class="font-bold text-slate-700">0đ</span>
+                            </div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-slate-600">Phí ship dự kiến:</span>
+                                <span id="preview-ship-price" class="font-bold text-slate-700">15.000đ</span>
+                            </div>
+                            <div class="flex justify-between items-center mt-2 pt-2 border-t border-blue-200">
+                                <span class="font-black uppercase text-blue-900">Tổng tạm tính:</span>
+                                <span id="preview-total-price" class="font-black text-xl text-blue-700">0đ</span>
+                            </div>
+                            <p id="preview-warning" class="text-[10px] text-red-500 mt-2 italic font-bold hidden">* File DOCX/DOC chỉ đếm trang tương đối dựa trên số chữ. Nếu số lượng sai lệch nhiều, Admin sẽ cập nhật lại sau.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-sm font-medium text-slate-700 mb-1">Mã giảm giá</label><input type="text" id="order-voucher" class="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 uppercase" placeholder="SALE50"></div>
+                            <div><label class="block text-sm font-medium text-slate-700 mb-1">Ghi chú</label><input type="text" id="order-note" class="w-full p-3 border border-slate-200 rounded-xl bg-slate-50" placeholder="VD: In 2 mặt, đóng bìa..."></div>
+                        </div>
+                        <button type="submit" class="w-full bg-brand-600 text-white py-3.5 rounded-xl font-bold hover:bg-brand-700 shadow-lg shadow-brand-500/20 active:scale-95 transition flex items-center justify-center gap-2"><i class="fa-solid fa-cloud-arrow-up"></i> Tải lên & Tạo đơn</button>
                     </form>
                 </div>
 
@@ -820,7 +857,33 @@
                         </div>
                     </div>
                 </div>
-
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mt-5 mb-5 mx-4 md:mx-0">
+                        <div class="flex items-center justify-between mb-4 border-b pb-2">
+                            <h3 class="font-bold text-slate-800"><i class="fa-solid fa-calculator text-brand-600 mr-1"></i> Cấu hình Báo giá & Vận chuyển</h3>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="admin-toggle-autoquote" class="sr-only peer" checked onchange="saveSystemConfig()">
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                <span class="ml-3 text-sm font-bold text-slate-700">Bật Auto Đếm Trang</span>
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Giá 1 tờ (VNĐ)</label>
+                                <input type="number" id="admin-price-per-page" class="w-full p-2 border rounded-lg bg-slate-50 font-bold text-brand-600" value="350">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Phí Ship mặc định (VNĐ)</label>
+                                <input type="number" id="admin-default-ship" class="w-full p-2 border rounded-lg bg-slate-50 font-bold" value="15000">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Freeship cho đơn từ (VNĐ)</label>
+                                <input type="number" id="admin-free-ship-from" class="w-full p-2 border rounded-lg bg-slate-50 font-bold" value="150000">
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-end">
+                            <button onclick="saveSystemConfig()" class="bg-brand-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-brand-700 shadow-sm active:scale-95"><i class="fa-solid fa-save mr-1"></i> Lưu Cấu Hình</button>
+                        </div>
+                    </div>
                 <div id="view-admin-chat" class="view-section max-w-6xl mx-auto hidden fade-in h-[calc(100vh-8rem)] md:h-[80vh]"><h2 class="text-xl md:text-2xl font-bold mb-4">Hỗ trợ khách hàng</h2><div class="bg-white border rounded-xl shadow-sm flex flex-col md:flex-row h-full overflow-hidden"><div class="w-full md:w-1/3 border-b md:border-b-0 md:border-r bg-slate-50 flex flex-col h-1/3 md:h-auto"><div class="p-3 border-b font-bold text-slate-600 text-sm">Khách hàng</div><div id="admin-chat-list" class="flex-1 overflow-y-auto"></div></div><div class="w-full md:w-2/3 flex flex-col bg-white h-2/3 md:h-auto" id="admin-chat-area"><div class="p-3 border-b flex justify-between items-center bg-slate-50 h-12 md:h-14 shrink-0"><span id="admin-chat-header" class="font-bold text-brand-700 text-sm truncate">Chọn khách hàng</span></div><div id="admin-chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50 text-sm"><div class="text-center text-slate-400 mt-10">Chưa chọn cuộc hội thoại nào</div></div><form onsubmit="sendAdminChat(event)" class="p-2 md:p-3 border-t flex gap-2 hidden shrink-0" id="admin-chat-form"><input id="admin-chat-input" type="text" class="flex-1 p-2 border rounded-lg text-sm" placeholder="Nhập tin nhắn..."><button type="submit" class="bg-brand-600 text-white p-2 px-4 rounded-lg"><i class="fa-solid fa-paper-plane"></i></button></form></div></div></div>
                 <div id="view-admin-vouchers" class="view-section max-w-4xl mx-auto hidden fade-in pb-10"><div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold">Mã Giảm Giá</h2><button onclick="document.getElementById('form-voucher-create').classList.toggle('hidden')" class="bg-green-600 text-white px-3 py-1.5 text-sm rounded hover:bg-green-700">+ Tạo</button></div><div id="form-voucher-create" class="bg-white p-4 rounded-xl shadow-sm mb-6 hidden border border-green-100"><form onsubmit="handleCreateVoucher(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3"><input type="text" id="v-code" required class="p-2 border rounded uppercase text-sm" placeholder="Mã (VD: TET)"><select id="v-type" class="p-2 border rounded text-sm"><option value="percent">Giảm %</option><option value="fixed">Trừ tiền</option><option value="freeship">Free Ship</option></select><input type="number" id="v-value" required class="p-2 border rounded text-sm" placeholder="Giá trị"><input type="number" id="v-qty" required class="p-2 border rounded text-sm" placeholder="SL"><button type="submit" class="md:col-span-4 bg-green-600 text-white py-2 rounded font-bold text-sm">Lưu</button></form></div><div class="bg-white rounded-xl shadow overflow-hidden overflow-x-auto"><table class="w-full text-left min-w-[500px]"><thead class="bg-slate-100 text-xs uppercase text-slate-500"><tr><th class="p-3">Mã</th><th class="p-3">Loại</th><th class="p-3">Giá trị</th><th class="p-3">SL</th><th class="p-3 text-right">Xóa</th></tr></thead><tbody id="voucher-list" class="text-sm"></tbody></table></div></div>
                <div id="view-admin-gacha" class="view-section max-w-6xl mx-auto hidden fade-in pb-10">
@@ -1071,11 +1134,11 @@ import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/fireb
         const auth = getAuth(app);
         const googleProvider = new GoogleAuthProvider();
         googleProvider.setCustomParameters({ prompt: "select_account" });
-        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
+      const db = initializeFirestore(app, {});
 const messaging = (() => { try { return getMessaging(app); } catch (e) { console.warn('Firebase Messaging không khả dụng trong môi trường này:', e?.message || e); return null; } })();
 // --- HỆ THỐNG GỬI MAIL TỰ ĐỘNG BẰNG GOOGLE APPS SCRIPT ---
         // !!! QUAN TRỌNG: Thay link dưới đây bằng link Web App URL của ông !!!
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEtGPhdBCHjBsG7jmraxVDHA7oz94SjkZpGC8ePCEM-e_VEMgzPykZbCGbdt8tmPtnnQ/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyndMOT9AFeGdUsnDCjQTNXcVm4tJ338LC89CECRdqm1rcWPtZfCLIkZnppp_kPMHHGDA/exec"; 
 
         window.sendMailAPI = async (toEmail, subject, htmlContent) => {
             try {
@@ -1157,11 +1220,55 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
         let adminWalletLogUnsub = null;
         let adminAutoUnsubs = [];
         let currentWalletBalance = 0;
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+let currentCalculatedPages = 0;
+let currentCalculatedPrintPrice = 0;
+let currentCalculatedShipPrice = 0;
+let currentFileObj = null;
         let currentNotificationTarget = null;
         let notificationDocsCache = [];
         let notificationInitialised = false;
         const BANK_INFO = { bin: "970436", accountNo: "1047262114", accountName: "TRAN NGUYEN PHU VINH", accountHolder: "Trần Nguyễn Phú Vinh", bankName: "VCB" };
-        const AUTO_QUOTE_CONFIG = { pricePerPage: 350, defaultShip: 15000, minPrint: 0, freeShipFrom: 150000 };
+       let AUTO_QUOTE_CONFIG = { pricePerPage: 350, defaultShip: 15000, minPrint: 0, freeShipFrom: 150000, enableAuto: true };
+
+        // Lắng nghe cấu hình hệ thống từ Firebase
+        onSnapshot(doc(db, "config", "system"), (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                if (data.quoteConfig) {
+                    AUTO_QUOTE_CONFIG = { ...AUTO_QUOTE_CONFIG, ...data.quoteConfig };
+                    
+                    const priceInput = document.getElementById('admin-price-per-page');
+                    if (priceInput) {
+                        priceInput.value = AUTO_QUOTE_CONFIG.pricePerPage;
+                        document.getElementById('admin-default-ship').value = AUTO_QUOTE_CONFIG.defaultShip;
+                        document.getElementById('admin-free-ship-from').value = AUTO_QUOTE_CONFIG.freeShipFrom;
+                        document.getElementById('admin-toggle-autoquote').checked = AUTO_QUOTE_CONFIG.enableAuto;
+                    }
+                    
+                    // Cập nhật giá niêm yết cho khách thấy
+                    const publicPriceEls = document.querySelectorAll('.text-3xl.font-black.text-blue-700');
+                    publicPriceEls.forEach(el => {
+                        if(el.innerText.includes('đ')) el.innerText = `${AUTO_QUOTE_CONFIG.pricePerPage} đ`;
+                    });
+                }
+            }
+        });
+
+        // Hàm Admin lưu cấu hình
+        window.saveSystemConfig = async () => {
+            if (!requireAdmin()) return;
+            const newConfig = {
+                pricePerPage: Number(document.getElementById('admin-price-per-page').value) || 0,
+                defaultShip: Number(document.getElementById('admin-default-ship').value) || 0,
+                freeShipFrom: Number(document.getElementById('admin-free-ship-from').value) || 0,
+                enableAuto: document.getElementById('admin-toggle-autoquote').checked
+            };
+            try {
+                await setDoc(doc(db, "config", "system"), { quoteConfig: newConfig, updatedAt: serverTimestamp() }, { merge: true });
+                showToast("Đã lưu cấu hình bảng giá thành công!");
+            } catch (error) { showToast(error.message, "error"); }
+        };
 
         const GACHA_CONFIG_KEY = 'printshop_gacha_config_v3';
         const GACHA_WEEK_SPIN_AMOUNT = 5000;
@@ -1390,11 +1497,15 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
             if (requestedTab.startsWith('user-') && currentSessionRole === 'admin') safeTab = 'admin-automation';
             const target = document.getElementById(`view-${safeTab}`);
             if (!target) { showToast('Không tìm thấy trang: ' + safeTab, 'error'); return; }
-            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+       document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
             target.classList.remove('hidden');
             updateActiveNav(safeTab);
             if (safeTab === 'user-rank') loadLeaderboard('week');
-          if (safeTab === 'user-gacha') { loadGachaItems().then(items => applyGachaWheel(items)); window.loadGachaHistory(); }
+            if (safeTab === 'user-gacha') { loadGachaItems().then(items => applyGachaWheel(items)); window.loadGachaHistory(); }
+            
+            // Ép render thần tốc dữ liệu cho Admin khi bấm chuyển đổi Tab
+            if (safeTab === 'admin-users') renderAdminUsersFromCache();
+            if (safeTab === 'admin-mining') renderAdminMiningFromCache();
         };
         function updateActiveNav(tabId) { document.querySelectorAll('.nav-btn, .menu-item').forEach(btn => { if (btn.dataset?.tab === tabId || btn.getAttribute('onclick')?.includes(tabId)) { btn.classList.add('text-brand-600', 'bg-slate-50'); btn.classList.remove('text-slate-600', 'text-slate-400'); } else { btn.classList.remove('text-brand-600', 'bg-slate-50'); btn.classList.add('text-slate-600'); } }); }
         
@@ -1701,21 +1812,9 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                         }
                     }
 
-                    // --- SỬA: Hiển thị danh hiệu trên cả Desktop và Mobile ---
-document.getElementById('display-name-d').innerHTML = `
-    <div class="flex flex-col items-center">
-        <span>${name}</span>
-        ${titleHtml ? `<div class="mt-1">${titleHtml}</div>` : ''}
-    </div>
-`;
-
-// Mobile thường nhỏ, nên ta để danh hiệu xuống dòng hoặc thu nhỏ
-document.getElementById('display-name-m').innerHTML = `
-    <div class="flex flex-col items-end">
-        <span class="truncate w-24 text-right">${name}</span>
-        ${titleHtml ? `<div class="scale-75 origin-right -mt-0.5">${titleHtml}</div>` : ''}
-    </div>
-`;
+                  // --- ĐÃ TỐI ƯU CHUỖI HIỂN THỊ DANH HIỆU ---
+                    document.getElementById('display-name-d').innerHTML = `<div class="flex flex-col items-center"><span>${name}</span>${titleHtml ? `<div class="mt-1">${titleHtml}</div>` : ''}</div>`;
+                    document.getElementById('display-name-m').innerHTML = `<div class="flex flex-col items-end"><span class="truncate w-24 text-right">${name}</span>${titleHtml ? `<div class="scale-75 origin-right -mt-0.5">${titleHtml}</div>` : ''}</div>`;
                     document.getElementById('user-avatar-d').src = avatar;
                     document.getElementById('user-avatar-m').src = avatar;
                     document.getElementById('user-avatar-member').src = avatar;
@@ -1806,57 +1905,95 @@ document.getElementById('display-name-m').innerHTML = `
         }
 
         // --- PET ACTIONS ---
-        window.handleFeedPet = async () => {
-            try {
-                const userRef = doc(db, "users", currentUser.uid);
-                const snap = await getDoc(userRef);
-                const data = snap.data();
-                const pet = data.pet || { level: 1, currentXp: 0, form: 0 };
-                
-                if (!data.petFood || data.petFood <= 0) return showToast("Hết thức ăn rồi! Hãy in thêm tài liệu.", "error");
+      window.handleFeedPet = async () => {
+    // Thêm khóa chống spam
+    const btn = document.querySelector('button[onclick="handleFeedPet()"]');
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
 
-                let newFood = data.petFood - 1;
-                let newXp = pet.currentXp + 1;
-                let newLevel = pet.level;
-                let xpNeeded = Math.max(10, newLevel * 10);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, "users", currentUser.uid);
+            const snap = await transaction.get(userRef);
+            if (!snap.exists()) throw new Error("Không tìm thấy dữ liệu.");
+            
+            const data = snap.data();
+            const pet = data.pet || { level: 1, currentXp: 0, form: 0 };
+            
+            if (!data.petFood || data.petFood <= 0) throw new Error("Hết thức ăn rồi! Hãy in thêm tài liệu.");
 
+            let newFood = data.petFood - 1;
+            let newXp = pet.currentXp + 1;
+            let newLevel = pet.level;
+            let xpNeeded = Math.max(10, newLevel * 10);
+
+            if (newXp >= xpNeeded) {
+                newXp = 0;
+                newLevel++;
+                setTimeout(() => {
+                    showToast(`🎉 Pet lên cấp ${newLevel}!`);
+                    if (maxPetFormForLevel(newLevel) > (pet.form || 0)) {
+                        showToast(`⚡ Pet đã đủ cấp để tiến hóa. Dùng Đá Tiến Hóa để mở form mới!`, 'info');
+                    }
+                }, 100);
+            }
+
+            transaction.update(userRef, {
+                petFood: newFood,
+                pet: { ...pet, level: newLevel, currentXp: newXp, form: pet.form }
+            });
+            
+            // UI Update nhẹ
+            setTimeout(() => {
                 const viewer = document.getElementById('pet-3d-model');
                 if (viewer) {
                     viewer.style.transform = "scale(1.2)";
                     setTimeout(() => viewer.style.transform = "scale(1)", 200);
                 }
+            }, 50);
+        });
+    } catch (e) { 
+        showToast(e.message, 'error'); 
+    } finally {
+        if (btn) setTimeout(() => btn.disabled = false, 300);
+    }
+};
 
-                if (newXp >= xpNeeded) {
-                    newXp = 0;
-                    newLevel++;
-                    showToast(`🎉 Pet lên cấp ${newLevel}!`);
-                    if (maxPetFormForLevel(newLevel) > (pet.form || 0)) {
-                        showToast(`⚡ Pet đã đủ cấp để tiến hóa. Dùng Đá Tiến Hóa để mở form mới!`, 'info');
-                    }
-                }
-
-                await updateDoc(userRef, {
-                    petFood: newFood,
-                    pet: { ...pet, level: newLevel, currentXp: newXp, form: pet.form }
-                });
-            } catch (e) { showToast(e.message, 'error'); }
-        };
-
-        window.handleEvolvePet = async () => {
+       window.handleEvolvePet = async () => {
+            const btn = document.getElementById('btn-evolve');
+            if (btn.disabled) return;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Chờ...';
+            
             try {
-                const userRef = doc(db, "users", currentUser.uid);
-                const snap = await getDoc(userRef);
-                const data = snap.data() || {};
-                const stones = data.evolutionStones || 0;
-                const pet = data.pet || { level: 1, currentXp: 0, form: 0 };
-                const currentForm = clampNumber(pet.form || 0, 0, PET_FORM_NAMES.length - 1);
-                const maxUnlockedForm = maxPetFormForLevel(pet.level || 1);
-                if (currentForm >= maxUnlockedForm) return showToast(`Pet cần đạt Level ${(currentForm + 1) * 10} để mở form tiếp theo.`, "error");
-                if (stones < 1) return showToast("Thiếu đá tiến hóa!", "error");
-                const newForm = Math.min(PET_FORM_NAMES.length - 1, currentForm + 1);
-                await updateDoc(userRef, { evolutionStones: stones - 1, "pet.form": newForm, updatedAt: serverTimestamp() });
-                showToast(`✨ TIẾN HÓA THÀNH CÔNG: ${PET_FORM_NAMES[newForm]}! ✨`);
-            } catch(e) { showToast(e.message, 'error'); }
+                await runTransaction(db, async (transaction) => {
+                    const userRef = doc(db, "users", currentUser.uid);
+                    const snap = await transaction.get(userRef);
+                    if (!snap.exists()) throw new Error("Lỗi dữ liệu.");
+                    const data = snap.data() || {};
+                    const stones = data.evolutionStones || 0;
+                    const pet = data.pet || { level: 1, currentXp: 0, form: 0 };
+                    const currentForm = clampNumber(pet.form || 0, 0, PET_FORM_NAMES.length - 1);
+                    const maxUnlockedForm = maxPetFormForLevel(pet.level || 1);
+                    
+                    if (currentForm >= maxUnlockedForm) throw new Error(`Pet cần đạt Level ${(currentForm + 1) * 10} để mở form tiếp theo.`);
+                    if (stones < 1) throw new Error("Thiếu đá tiến hóa!");
+                    
+                    const newForm = Math.min(PET_FORM_NAMES.length - 1, currentForm + 1);
+                    transaction.update(userRef, { 
+                        evolutionStones: stones - 1, 
+                        "pet.form": newForm, 
+                        updatedAt: serverTimestamp() 
+                    });
+                    
+                    setTimeout(() => showToast(`✨ TIẾN HÓA THÀNH CÔNG: ${PET_FORM_NAMES[newForm]}! ✨`), 200);
+                });
+            } catch(e) { 
+                showToast(e.message, 'error'); 
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Tiến hóa';
+            }
         };
 
         // --- MINING SYSTEM ---
@@ -1974,65 +2111,105 @@ function initMiningSystem(lastMiningTime, petLevel, manualTickets = 0) {
 
 window.handleClaimMiningOne = async () => {
     if (!currentUser || currentSessionRole !== 'user') return showToast('Chỉ thành viên mới dùng hầm mỏ.', 'error');
+    
+    // KHÓA NÚT NGAY LẬP TỨC CHỐNG SPAM
     const btn = document.getElementById('btn-claim-mining');
+    if (btn.disabled) return; 
+    btn.disabled = true;
     if (btn) { btn.style.transform = "scale(0.95)"; setTimeout(() => btn.style.transform = "scale(1)", 100); }
+    
     try {
-        const userRef = doc(db, "users", currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        const data = userSnap.data() || {};
-        const now = new Date();
-        let last = data.lastMiningTime?.toDate ? data.lastMiningTime.toDate() : (data.lastMiningTime ? new Date(data.lastMiningTime) : now);
-        if (Number.isNaN(last.getTime())) last = now;
-        const cycleMs = MINING_CYCLE_MS;
-        const diffMs = Math.max(0, now - last);
-        const autoSlots = Math.max(0, Math.floor(diffMs / cycleMs));
-        const manualTickets = Math.max(0, Math.floor(Number(data.miningTickets || 0)));
-        const pendingSlots = autoSlots + manualTickets;
-        if (pendingSlots <= 0) return showToast("Chưa đủ thời gian để đào!", "error");
+        await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, "users", currentUser.uid);
+            const userSnap = await transaction.get(userRef);
+            const data = userSnap.data() || {};
+            
+         const now = new Date();
+let last = now;
 
-        const petLevel = data.pet?.level || 1;
-        const stats = calculateMiningStats(petLevel);
-        const roll = Math.random() * 100;
-        let reward = null;
-        let currentSum = 0;
-        currentSum += stats.emptyChance;
-        if (roll < currentSum) reward = { type: 'empty', name: 'Đất đá vụn', class: 'text-slate-500' };
-        else {
-            currentSum += stats.resourceChance;
-            if (roll < currentSum) {
-                const val = Math.floor(Math.random() * 5) + 1;
-                reward = Math.random() > 0.5 ? { type: 'points', value: val, name: `+${val} Điểm`, class: 'text-yellow-400' } : { type: 'exp', value: val, name: `+${val} EXP Pet`, class: 'text-green-400' };
-            } else {
-                currentSum += stats.commonChance;
-                if (roll < currentSum) { const val = Math.floor(Math.random() * 10) + 1; reward = { type: 'voucher', subType: 'common', value: val, name: `Voucher ${val}%`, class: 'text-blue-400' }; }
-                else { currentSum += stats.rareChance; if (roll < currentSum) { const val = Math.floor(Math.random() * 40) + 11; reward = { type: 'voucher', subType: 'rare', value: val, name: `Voucher Hiếm ${val}%`, class: 'text-purple-400 font-bold' }; } else { const val = Math.floor(Math.random() * 50) + 51; reward = { type: 'voucher', subType: 'legend', value: val, name: `VOUCHER VIP ${val}%`, class: 'text-red-500 font-bold animate-pulse' }; } }
+// Bắt chuẩn xác mọi định dạng thời gian Firebase trả về (kể cả Local Cache)
+if (data.lastMiningTime) {
+    if (typeof data.lastMiningTime.toDate === 'function') {
+        last = data.lastMiningTime.toDate();
+    } else if (data.lastMiningTime.seconds) {
+        last = new Date(data.lastMiningTime.seconds * 1000);
+    } else if (typeof data.lastMiningTime === 'number' || typeof data.lastMiningTime === 'string') {
+        last = new Date(data.lastMiningTime);
+    }
+}
+if (Number.isNaN(last.getTime())) last = now;
+            
+            const cycleMs = MINING_CYCLE_MS;
+            const diffMs = Math.max(0, now - last);
+            const autoSlots = Math.max(0, Math.floor(diffMs / cycleMs));
+            const manualTickets = Math.max(0, Math.floor(Number(data.miningTickets || 0)));
+            const pendingSlots = autoSlots + manualTickets;
+            
+            if (pendingSlots <= 0) throw new Error("Chưa đủ thời gian hoặc hết lượt để đào!");
+
+            const petLevel = data.pet?.level || 1;
+            const stats = calculateMiningStats(petLevel);
+            const roll = Math.random() * 100;
+            let reward = null;
+            let currentSum = 0;
+            currentSum += stats.emptyChance;
+            
+            if (roll < currentSum) reward = { type: 'empty', name: 'Đất đá vụn', class: 'text-slate-500' };
+            else {
+                currentSum += stats.resourceChance;
+                if (roll < currentSum) {
+                    const val = Math.floor(Math.random() * 5) + 1;
+                    reward = Math.random() > 0.5 ? { type: 'points', value: val, name: `+${val} Điểm`, class: 'text-yellow-400' } : { type: 'exp', value: val, name: `+${val} EXP Pet`, class: 'text-green-400' };
+                } else {
+                    currentSum += stats.commonChance;
+                    if (roll < currentSum) { const val = Math.floor(Math.random() * 10) + 1; reward = { type: 'voucher', subType: 'common', value: val, name: `Voucher ${val}%`, class: 'text-blue-400' }; }
+                    else { currentSum += stats.rareChance; if (roll < currentSum) { const val = Math.floor(Math.random() * 40) + 11; reward = { type: 'voucher', subType: 'rare', value: val, name: `Voucher Hiếm ${val}%`, class: 'text-purple-400 font-bold' }; } else { const val = Math.floor(Math.random() * 50) + 51; reward = { type: 'voucher', subType: 'legend', value: val, name: `VOUCHER VIP ${val}%`, class: 'text-red-500 font-bold animate-pulse' }; } }
+                }
             }
-        }
 
-        const batch = writeBatch(db);
-        const updates = {};
-        let nextManualTickets = manualTickets;
-        let newTime = last;
-        if (manualTickets > 0) { updates.miningTickets = increment(-1); nextManualTickets = manualTickets - 1; }
-        else { newTime = new Date(last.getTime() + cycleMs); updates.lastMiningTime = newTime; }
-        if (reward.type === 'points') { updates.points = increment(reward.value); updates.weekScore = increment(reward.value); updates.monthScore = increment(reward.value); }
-        if (reward.type === 'exp') updates["pet.currentXp"] = increment(reward.value);
-        batch.update(userRef, updates);
-        let earnedCode = null;
-        if (reward.type === 'voucher') {
-            earnedCode = `MINE${Date.now().toString().slice(-6)}${Math.floor(Math.random()*100)}`;
-            const vRef = doc(collection(db, "vouchers"));
-            batch.set(vRef, { code: earnedCode, type: 'percent', value: reward.value, quantity: 1, ownerId: currentUser.uid, createdAt: serverTimestamp(), source: 'mining' });
-        }
-        const logRef = doc(collection(db, "users", currentUser.uid, "mining_logs"));
-        const logData = { name: reward.name, type: reward.type, value: reward.value || 0, class: reward.class, createdAt: serverTimestamp() };
-        if (earnedCode) logData.code = earnedCode;
-        batch.set(logRef, logData);
-        await batch.commit();
-        initMiningSystem(newTime, petLevel, nextManualTickets);
-        if (reward.type === 'empty') showToast("Chỉ đào được đất đá...", "info");
-        else showToast(`Tuyệt vời! Bạn nhận được: ${reward.name}`);
-    } catch (err) { console.error(err); showToast("Lỗi đào: " + err.message, "error"); }
+            const updates = {};
+            let nextManualTickets = manualTickets;
+            let newTime = last;
+            
+            if (manualTickets > 0) { 
+                updates.miningTickets = increment(-1); 
+                nextManualTickets = manualTickets - 1; 
+            } else { 
+                newTime = new Date(last.getTime() + cycleMs); 
+                updates.lastMiningTime = newTime; 
+            }
+            
+            if (reward.type === 'points') { updates.points = increment(reward.value); updates.weekScore = increment(reward.value); updates.monthScore = increment(reward.value); }
+            if (reward.type === 'exp') updates["pet.currentXp"] = increment(reward.value);
+            
+            transaction.update(userRef, updates);
+            
+            let earnedCode = null;
+            if (reward.type === 'voucher') {
+                earnedCode = `MINE${Date.now().toString().slice(-6)}${Math.floor(Math.random()*100)}`;
+                const vRef = doc(collection(db, "vouchers"));
+                transaction.set(vRef, { code: earnedCode, type: 'percent', value: reward.value, quantity: 1, ownerId: currentUser.uid, createdAt: serverTimestamp(), source: 'mining' });
+            }
+            
+            const logRef = doc(collection(db, "users", currentUser.uid, "mining_logs"));
+            const logData = { name: reward.name, type: reward.type, value: reward.value || 0, class: reward.class, createdAt: serverTimestamp() };
+            if (earnedCode) logData.code = earnedCode;
+            transaction.set(logRef, logData);
+            
+            // Xử lý UI nội bộ sau khi transaction thành công
+            setTimeout(() => {
+                initMiningSystem(newTime, petLevel, nextManualTickets);
+                if (reward.type === 'empty') showToast("Chỉ đào được đất đá...", "info");
+                else showToast(`Tuyệt vời! Bạn nhận được: ${reward.name}`);
+            }, 100);
+        });
+    } catch (err) { 
+        console.error(err); 
+        showToast("Lỗi đào: " + err.message, "error"); 
+    } finally {
+        // Mở lại nút (nếu logic initMiningSystem chưa khóa lại)
+        setTimeout(() => { if(btn) btn.disabled = false; }, 500);
+    }
 };
 
 // --- 2. CẬP NHẬT: TẢI LỊCH SỬ (Hiển thị mã code để copy) ---
@@ -2114,15 +2291,15 @@ window.clearMiningHistory = async () => {
             return map;
         }
 
-        function initAdminUsers() {
+function initAdminUsers() {
             onSnapshot(collection(db, "users"), (snapshot) => {
                 adminUsersCache = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-                renderAdminUsersFromCache();
+                if (document.getElementById('admin-users-list')) renderAdminUsersFromCache();
+                if (document.getElementById('admin-mining-list')) renderAdminMiningFromCache();
             }, (error) => {
                 showToast('Không tải được hội viên: ' + error.message, 'error');
             });
         }
-
         window.renderAdminUsersFromCache = () => {
             const list = document.getElementById('admin-users-list');
             if (!list) return;
@@ -2174,13 +2351,9 @@ window.clearMiningHistory = async () => {
             const manual = Math.max(0, Math.floor(Number(u.miningTickets || 0)));
             return { autoSlots, manual, total: autoSlots + manual, lastMs };
         }
-        function initAdminMining() {
+      function initAdminMining() {
             if (!requireAdmin()) return;
-            if (adminMiningUnsub) adminMiningUnsub();
-            adminMiningUnsub = onSnapshot(collection(db, "users"), (snapshot) => {
-                adminUsersCache = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-                renderAdminMiningFromCache();
-            }, (error) => showToast('Không tải được lượt đào: ' + error.message, 'error'));
+            renderAdminMiningFromCache();
         }
         window.refreshAdminMiningList = () => { if (!requireAdmin()) return; renderAdminMiningFromCache(); };
         window.renderAdminMiningFromCache = () => {
@@ -2320,6 +2493,11 @@ window.openGiftModal = async (uid, email) => {
 window.handleAdminGift = async (e) => {
     e.preventDefault();
     if (!requireAdmin()) return;
+    // --- THÊM KHÓA NÚT Ở ĐÂY ---
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang xử lý...';
     const uid = document.getElementById('gift-uid').value;
     
     // Lấy giá trị số (có thể là số âm để trừ)
@@ -2531,57 +2709,159 @@ window.handleAdminGift = async (e) => {
                 container.innerHTML = `<div class="text-red-500 text-center text-sm">Lỗi: ${e.message}</div>`;
             }
         };
+// --- HÀM UPLOAD FILE LÊN DRIVE 5TB TỰ ĐỘNG CHIA THƯ MỤC ---
+        window.uploadFileToAdminDrive = async (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                
+                reader.onload = async () => {
+                    try {
+                        showToast("Đang tải file lên đám mây... Vui lòng không đóng trang", "info");
+                        
+                        // Tạo chuỗi thời gian chuẩn: "18-05-2026_19h45"
+                        const now = new Date();
+                        const timeStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth()+1).padStart(2, '0')}-${now.getFullYear()}_${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
 
-        window.handleCreateOrder = async (e) => {
+                        const response = await fetch(SCRIPT_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify({
+                                action: "uploadDrive",
+                                userEmail: currentUser.email, // Gửi Email khách
+                                orderTime: timeStr,           // Gửi thời gian tạo đơn
+                                fileName: file.name,
+                                mimeType: file.type,
+                                fileData: reader.result
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === "success") resolve(result.url); 
+                        else reject(new Error(result.message));
+                    } catch (err) { reject(err); }
+                };
+                reader.onerror = (error) => reject(error);
+            });
+        };
+      window.handleCreateOrder = async (e) => {
             e.preventDefault();
+            
+            const driveLinkInput = document.getElementById('order-drive-link').value.trim();
+            
+            // Check nếu khách không tải file mà cũng không dán link
+            if (!currentFileObj && !driveLinkInput) {
+                return showToast("Vui lòng tải file lên HOẶC dán link Google Drive!", "error");
+            }
+            
+            const btn = e.target.querySelector('button[type="submit"]');
+            const oldText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang xử lý...';
+
             try {
+                // 1. XÁC ĐỊNH LINK FILE CUỐI CÙNG
+                let finalDriveUrl = "";
+                if (currentFileObj) {
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải file lên Drive 5TB...';
+                    finalDriveUrl = await uploadFileToAdminDrive(currentFileObj);
+                } else {
+                    finalDriveUrl = driveLinkInput; // Dùng trực tiếp link khách gửi
+                }
+                
+                // 2. CHECK VOUCHER NẾU KHÁCH CÓ NHẬP
+                const voucherCode = document.getElementById('order-voucher').value.trim().toUpperCase() || null;
+                let disc = 0;
+                let voucherIdToUpdate = null;
+                let currentQty = 0;
+
+                if (voucherCode && currentCalculatedPages > 0) {
+                    const q = query(collection(db, "vouchers"), where("code", "==", voucherCode));
+                    const vSnap = await getDocs(q);
+                    if (!vSnap.empty) {
+                        const vDoc = vSnap.docs[0];
+                        const v = vDoc.data();
+                        if (v.quantity > 0) {
+                            voucherIdToUpdate = vDoc.id;
+                            currentQty = v.quantity;
+                            if (v.type === 'percent') disc = currentCalculatedPrintPrice * (v.value / 100);
+                            else if (v.type === 'fixed') disc = v.value;
+                            else if (v.type === 'freeship') disc = currentCalculatedShipPrice;
+                        } else {
+                            showToast(`Mã ${voucherCode} đã hết lượt! Đơn sẽ tính giá gốc.`, 'error');
+                        }
+                    } else {
+                        showToast(`Mã ${voucherCode} không tồn tại!`, 'error');
+                    }
+                }
+
+                // 3. TẠO PAYLOAD ĐƠN HÀNG
+                const finalPrice = Math.max(0, currentCalculatedPrintPrice + currentCalculatedShipPrice - disc);
+                const finalStatus = currentCalculatedPages > 0 ? 'pending_payment' : 'pending_quote';
+
                 const orderPayload = {
                     userId: currentUser.uid,
                     userEmail: currentUser.email,
-                    driveLink: document.getElementById('order-link').value,
+                    driveLink: finalDriveUrl, // <-- Dùng link cuối cùng
                     userNote: document.getElementById('order-note').value,
-                    adminNote: "",
-                    appliedCode: document.getElementById('order-voucher').value.trim().toUpperCase() || null,
-                    status: 'pending_quote',
-                    printPrice: 0,
-                    shipPrice: 0,
-                    discountAmount: 0,
-                    totalPrice: 0,
+                    adminNote: currentCalculatedPages > 0 ? "Hệ thống tự động báo giá qua PDF/DOCX." : "Dùng Link Drive ngoài hoặc File cũ. Chờ Admin đếm số lượng.",
+                    appliedCode: voucherCode,
+                    status: finalStatus,
+                    pages: currentCalculatedPages,
+                    printPrice: currentCalculatedPrintPrice,
+                    shipPrice: currentCalculatedShipPrice,
+                    discountAmount: disc,
+                    totalPrice: finalPrice,
                     createdAt: serverTimestamp()
                 };
-                const orderRef = await addDoc(collection(db, "orders"), orderPayload);
-                sendNotification('admin', `Có đơn hàng mới #${orderRef.id.slice(0,6)} từ ${currentUser.displayName || currentUser.email}`, { title: 'Đơn hàng mới', type: 'order', refId: orderRef.id });
-                showToast("Đã gửi đơn!");
 
-                // BÁO TELEGRAM CHO ADMIN (THÊM MỚI VÀO ĐÂY)
-                window.sendTelegramAdmin(
-                    `🚨 <b>CÓ ĐƠN ĐẶT IN MỚI!</b>\n` +
-                    `Khách: ${currentUser.displayName || currentUser.email}\n` +
-                    `Mã đơn: #${orderRef.id.slice(0,6)}\n` +
-                    `Ghi chú: ${orderPayload.userNote || 'Không có'}\n` +
-                    `<a href="${orderPayload.driveLink}">👉 Nhấn vào đây để xem file</a>`
-                );
-                // BẮN MAIL BÁO NHẬN ĐƠN CHO KHÁCH
-                window.sendMailAPI(
-                    currentUser.email,
-                    `[PrintShop] Đã nhận yêu cầu đặt in #${orderRef.id.slice(0,6)}`,
-                    `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">
-                        <h2 style="color: #2563eb; margin-top: 0;">Xin chào ${currentUser.displayName || 'bạn'},</h2>
-                        <p>Hệ thống <b>PrintShop Pro</b> đã ghi nhận yêu cầu in tài liệu của bạn.</p>
-                        <ul style="background: #f8fafc; padding: 15px 30px; border-radius: 8px;">
-                            <li><b>Mã đơn:</b> #${orderRef.id.slice(0,6)}</li>
-                            <li><b>Tài liệu:</b> <a href="${orderPayload.driveLink}" style="color: #2563eb;">Xem file đính kèm</a></li>
-                            <li><b>Ghi chú:</b> ${orderPayload.userNote || 'Không có'}</li>
-                        </ul>
-                        <p>Admin sẽ tiến hành kiểm tra số trang và báo giá trong thời gian sớm nhất. Bạn nhớ để ý thông báo nhé!</p>
-                        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-                        <p style="font-size: 12px; color: #64748b; text-align: center;">Đây là email tự động, vui lòng không trả lời.</p>
-                    </div>`
-                );
+                const batch = writeBatch(db);
+                const newOrderRef = doc(collection(db, "orders"));
+                batch.set(newOrderRef, orderPayload);
+                if (voucherIdToUpdate) {
+                    batch.update(doc(db, "vouchers", voucherIdToUpdate), { quantity: currentQty - 1 });
+                }
+                await batch.commit();
 
+                // 4. BẮN THÔNG BÁO WEB VÀ TELEGRAM (SIÊU CHI TIẾT)
+                sendNotification('admin', `Có đơn in mới #${newOrderRef.id.slice(0,6)} từ ${currentUser.email}`, { title: 'Đơn hàng mới', type: 'order', refId: newOrderRef.id });
+                
+                let teleMsg = `🚨 <b>ĐƠN ĐẶT IN MỚI TỪ WEB!</b>\n`;
+                teleMsg += `👤 Khách: ${currentUser.displayName}\n`;
+                teleMsg += `🏷 Mã đơn: #${newOrderRef.id.slice(0,6)}\n`;
+                if (currentCalculatedPages > 0) {
+                    teleMsg += `📄 Số trang: <b>${currentCalculatedPages} trang</b>\n`;
+                    teleMsg += `🖨 Tiền in: ${fmtVND(currentCalculatedPrintPrice)}\n`;
+                    teleMsg += `🛵 Phí Ship: ${fmtVND(currentCalculatedShipPrice)}\n`;
+                    if (disc > 0) teleMsg += `🎟 Giảm giá: -${fmtVND(disc)}\n`;
+                    teleMsg += `💰 Tổng thu: <b>${fmtVND(finalPrice)}</b>\n`;
+                    teleMsg += `📌 Trạng thái: Đã có giá (Chờ KH Thanh toán)\n`;
+                } else {
+                    teleMsg += `📄 Định dạng File link ngoài (Chưa đếm trang)\n`;
+                    teleMsg += `📌 Trạng thái: Chờ Admin xem file & báo giá\n`;
+                }
+                teleMsg += `📝 Ghi chú: ${document.getElementById('order-note').value || 'Không có'}\n`;
+                teleMsg += `\n<a href="${finalDriveUrl}">👉 BẤM VÀO ĐÂY LẤY FILE IN</a>`;
+
+                window.sendTelegramAdmin(teleMsg);
+                
+                showToast("Đã gửi file & tạo đơn thành công!");
+                
+                // 5. RESET FORM VÀ CHUYỂN TAB
                 e.target.reset();
+                currentFileObj = null;
+                document.getElementById('order-drive-link').value = '';
+                document.getElementById('auto-quote-preview').classList.add('hidden');
                 switchTab('user-orders');
-            } catch (error) { showToast(error.message, 'error'); }
+currentCalculatedPages = 0;
+                currentCalculatedPrintPrice = 0;
+                currentCalculatedShipPrice = 0;
+            } catch (error) { 
+                showToast(error.message, 'error'); 
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = oldText;
+            }
         };
         function initUserOrders(uid) {
             const q = query(collection(db, "orders"), where("userId", "==", uid), orderBy("createdAt", "desc"));
@@ -2681,9 +2961,9 @@ window.handleAdminGift = async (e) => {
                         if (v.quantity > 0) {
                             voucherIdToUpdate = vDoc.id;
                             currentQty = v.quantity;
-                            if (v.type === 'percent') disc = p * (v.value / 100);
+if (v.type === 'percent') disc = p * (v.value / 100);
                             else if (v.type === 'fixed') disc = v.value;
-                            else if (v.type === 'freeship') disc = s;
+                            else if (v.type === 'freeship') disc = s; // Không tự ý sửa value trên ô nhập của Admin, để hệ thống tự trừ disc vào finalPrice
                         } else { showToast(`Mã ${codeString} đã hết lượt!`, 'error'); }
                     }
                 }
@@ -2893,7 +3173,7 @@ window.handleAdminGift = async (e) => {
                 list.innerHTML = docs.map(dep => {
                     const statusColor = dep.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : dep.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700 animate-pulse';
                     const statusText = dep.status === 'approved' ? 'Đã duyệt' : dep.status === 'rejected' ? 'Từ chối' : 'Chờ duyệt';
-                    const buttons = dep.status === 'pending' ? `<div class="flex gap-2 mt-3"><button onclick="approveDeposit('${dep.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl font-bold text-xs"><i class="fa-solid fa-check mr-1"></i> Duyệt & cộng ví</button><button onclick="rejectDeposit('${dep.id}')" class="bg-red-50 text-red-600 border border-red-100 px-3 py-2 rounded-xl font-bold text-xs"><i class="fa-solid fa-xmark"></i></button></div>` : '';
+                  const buttons = dep.status === 'pending' ? `<div class="flex gap-2 mt-3"><button onclick="approveDeposit('${dep.id}', this)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl font-bold text-xs"><i class="fa-solid fa-check mr-1"></i> Duyệt & cộng ví</button><button onclick="rejectDeposit('${dep.id}')" class="bg-red-50 text-red-600 border border-red-100 px-3 py-2 rounded-xl font-bold text-xs"><i class="fa-solid fa-xmark"></i></button></div>` : '';
                     return `<div class="p-4 hover:bg-slate-50 transition"><div class="flex flex-col md:flex-row gap-4"><img src="${vietQrUrl(dep.amount, dep.transferContent || dep.paymentCode)}" class="w-24 h-24 rounded-xl border border-slate-200 p-1 bg-white mx-auto md:mx-0"><div class="flex-1 min-w-0"><div class="flex justify-between gap-3"><div><div class="font-extrabold text-slate-800">${fmtVND(dep.amount)} <span class="text-[10px] px-2 py-1 rounded-full ${statusColor}">${statusText}</span></div><div class="text-xs text-slate-500 mt-1"><i class="fa-solid fa-envelope mr-1"></i>${sanitizeText(dep.userEmail)}</div><div class="text-xs text-slate-500"><i class="fa-regular fa-clock mr-1"></i>${formatTime(dep.createdAt)}</div></div></div><div class="mt-2 bg-slate-50 rounded-xl p-2 border border-slate-100"><div class="text-[10px] uppercase font-bold text-slate-400">Mã thanh toán + Gmail</div><div class="font-mono payment-code text-emerald-700 font-extrabold break-all select-all">${sanitizeText(dep.transferContent || dep.paymentCode)}</div></div>${dep.note ? `<div class="text-xs text-slate-500 mt-2 italic">${sanitizeText(dep.note)}</div>` : ''}${buttons}</div></div></div>`;
                 }).join('');
             });
@@ -2914,9 +3194,9 @@ window.handleAdminGift = async (e) => {
             });
         }
 
-   window.approveDeposit = async (depositId) => {
+ window.approveDeposit = async (depositId, btnElement) => {
             if (!requireAdmin()) return;
-            const btn = event?.currentTarget || event?.target; 
+            const btn = btnElement;
             let oldText = "Duyệt & cộng ví";
             if (btn && btn.tagName === 'BUTTON') {
                 oldText = btn.innerHTML;
@@ -2933,47 +3213,49 @@ window.handleAdminGift = async (e) => {
                 return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
             };
 
-            try {
+           try {
                 const depRef = doc(db, "deposits", depositId);
-                
-                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
-                const depSnap = await withTimeout(getDoc(depRef), 5000, "Đọc dữ liệu máy chủ");
-                if (!depSnap.exists()) { showToast('Không tìm thấy đơn nạp', 'error'); return; }
-                const dep = depSnap.data();
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
 
-                if (dep.status !== 'pending') { showToast('Đơn này đã xử lý rồi', 'error'); return; }
+                await runTransaction(db, async (transaction) => {
+                    // Đọc đơn nạp
+                    const depSnap = await transaction.get(depRef);
+                    if (!depSnap.exists()) throw new Error('Không tìm thấy đơn nạp');
+                    const dep = depSnap.data();
 
-                const amount = Number(dep.amount || 0);
-                const spinBonus = spinsFromAmount(amount);
-                const userRef = doc(db, "users", dep.userId);
+                    // Kiểm tra trạng thái nghiêm ngặt trong Transaction
+                    if (dep.status !== 'pending') throw new Error('Đơn này đã được xử lý rồi (Có thể do mạng lag, hoặc admin khác đã duyệt).');
 
-                const safePaymentCode = String(dep.paymentCode || dep.transferContent || 'KHONG_CO_MA');
-                const safeUserEmail = String(dep.userEmail || 'Chưa cập nhật email');
+                    const amount = Number(dep.amount || 0);
+                    const spinBonus = spinsFromAmount(amount);
+                    const userRef = doc(db, "users", dep.userId);
+                    const safeUserEmail = String(dep.userEmail || 'Chưa cập nhật email');
 
-                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu ví...';
-                // LƯU TIỀN CHO USER
-                await withTimeout(setDoc(userRef, {
-                    balance: increment(amount),
-                    totalDeposited: increment(amount),
-                    spins: spinBonus > 0 ? increment(spinBonus) : increment(0),
-                    walletUpdatedAt: serverTimestamp(),
-                    email: safeUserEmail
-                }, { merge: true }), 5000, "Cộng tiền lên máy chủ");
+                    // Ghi tiền
+                    transaction.set(userRef, {
+                        balance: increment(amount),
+                        totalDeposited: increment(amount),
+                        spins: spinBonus > 0 ? increment(spinBonus) : increment(0),
+                        walletUpdatedAt: serverTimestamp(),
+                        email: safeUserEmail
+                    }, { merge: true });
 
-                if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu log...';
-                // ĐỔI TRẠNG THÁI ĐƠN NẠP THÀNH CÔNG
-                await withTimeout(updateDoc(depRef, {
-                    status: 'approved',
-                    approvedAt: serverTimestamp(),
-                    approvedBy: String(currentUser?.email || ADMIN_EMAIL)
-                }), 5000, "Xác nhận duyệt đơn");
+                    // Đổi trạng thái
+                    transaction.update(depRef, {
+                        status: 'approved',
+                        approvedAt: serverTimestamp(),
+                        approvedBy: String(currentUser?.email || ADMIN_EMAIL)
+                    });
 
-                // Gửi thông báo
-                sendNotification(dep.userId, `Nạp ${fmtVND(amount)} thành công!`, { title: 'Nạp tiền thành công', type: 'deposit', refId: depositId });
-
-                showToast(`Thành công! Đã cộng ${fmtVND(amount)}`);
+                    // Bắn notification ra bên ngoài transaction
+                    setTimeout(() => {
+                        sendNotification(dep.userId, `Nạp ${fmtVND(amount)} thành công!`, { title: 'Nạp tiền thành công', type: 'deposit', refId: depositId });
+                        showToast(`Thành công! Đã cộng ${fmtVND(amount)}`);
+                    }, 100);
+                });
 
             } catch (e) {
+                // ... giữ nguyên phần báo lỗi của bạn ...
                 console.error("LỖI HỆ THỐNG:", e);
                 // Bật thẳng Alert để bắt buộc admin phải đọc lỗi
                 alert("LỖI XỬ LÝ:\n" + e.message); 
@@ -3063,7 +3345,8 @@ window.handleAdminGift = async (e) => {
         window.autoReminderSweep = async (showResult = true) => {
             if (!isCurrentAdmin()) return;
             try {
-                const snap = await getDocs(collection(db, "orders"));
+               const q = query(collection(db, "orders"), where("status", "==", "pending_payment"));
+const snap = await getDocs(q);
                 const batch = writeBatch(db);
                 const notify = [];
                 const now = Date.now();
@@ -3084,21 +3367,35 @@ window.handleAdminGift = async (e) => {
             } catch (e) { if (showResult) showToast('Lỗi quét nhắc thanh toán: ' + e.message, 'error'); }
         };
 
-        window.copyDailyPaymentReport = async () => {
+      window.copyDailyPaymentReport = async () => {
             if (!requireAdmin()) return;
             try {
-                const [ordersSnap, depositsSnap, usersSnap] = await Promise.all([getDocs(collection(db, "orders")), getDocs(collection(db, "deposits")), getDocs(collection(db, "users"))]);
+                // Tối ưu: Lấy số liệu ví trực tiếp từ DOM đã được tính ngầm, không query lại DB
+                const walletTotalStr = document.getElementById('auto-wallet-total')?.innerText || '0đ';
+                
+                const [ordersSnap, depositsSnap] = await Promise.all([
+                    getDocs(collection(db, "orders")), 
+                    getDocs(collection(db, "deposits"))
+                ]);
                 const today = new Date().toDateString();
                 let walletRevenue = 0, transferReview = 0, approvedDeposit = 0, pendingDeposit = 0;
-                ordersSnap.forEach(d => { const o = d.data(); const t = getDocMillis(o.paidAt || o.updatedAt || o.createdAt); if (new Date(t).toDateString() === today && o.paymentMethod === 'wallet' && o.status !== 'delivered') walletRevenue += Number(o.totalPrice || 0); if (o.status === 'payment_review') transferReview++; });
-                depositsSnap.forEach(d => { const dep = d.data(); if (dep.status === 'approved') approvedDeposit += Number(dep.amount || 0); if (dep.status === 'pending') pendingDeposit++; });
-                let walletTotal = 0; usersSnap.forEach(d => walletTotal += Number(d.data().balance || 0));
+                ordersSnap.forEach(d => { 
+                    const o = d.data(); 
+                    const t = getDocMillis(o.paidAt || o.updatedAt || o.createdAt); 
+                    if (new Date(t).toDateString() === today && o.paymentMethod === 'wallet' && o.status !== 'delivered') walletRevenue += Number(o.totalPrice || 0); 
+                    if (o.status === 'payment_review') transferReview++; 
+                });
+                depositsSnap.forEach(d => { 
+                    const dep = d.data(); 
+                    if (dep.status === 'approved') approvedDeposit += Number(dep.amount || 0); 
+                    if (dep.status === 'pending') pendingDeposit++; 
+                });
                 const report = `PRINTSHOP PRO - BÁO CÁO THANH TOÁN ${new Date().toLocaleDateString('vi-VN')}
 - Doanh thu ví hôm nay: ${fmtVND(walletRevenue)}
 - Nạp đã duyệt lũy kế: ${fmtVND(approvedDeposit)}
 - Yêu cầu nạp chờ duyệt: ${pendingDeposit}
 - Đơn thanh toán cũ chờ xử lý: ${transferReview}
-- Tổng số dư ví đang lưu hành: ${fmtVND(walletTotal)}
+- Tổng số dư ví đang lưu hành: ${walletTotalStr}
 Tài khoản nhận tiền: VCB ${BANK_INFO.accountNo} - ${BANK_INFO.accountHolder}`;
                 await navigator.clipboard?.writeText(report);
                 showToast('Đã copy báo cáo thanh toán.');
@@ -3106,10 +3403,10 @@ Tài khoản nhận tiền: VCB ${BANK_INFO.accountNo} - ${BANK_INFO.accountHold
         };
 
         window.toggleChat = () => { document.getElementById('chat-box').classList.toggle('hidden'); if(!document.getElementById('chat-box').classList.contains('hidden')) setTimeout(() => document.getElementById('chat-input').focus(), 100); }
-        function initUserChat(uid) { const q = query(collection(db, "chats", uid, "messages"), orderBy("createdAt", "asc")); onSnapshot(q, (snapshot) => { const div = document.getElementById('chat-messages'); div.innerHTML = '<div class="bg-blue-100 text-blue-800 p-2 rounded-lg rounded-tl-none self-start max-w-[85%] text-xs">Shop chào bạn! Cần giúp gì không ạ?</div>'; snapshot.forEach(d => { const m = d.data(); const cls = m.sender === 'user' ? "bg-brand-600 text-white self-end rounded-tr-none" : "bg-white border border-slate-200 text-slate-800 self-start rounded-tl-none"; div.innerHTML += `<div class="${cls} p-2 rounded-lg max-w-[85%] break-words text-xs shadow-sm">${m.text}</div>`; }); div.scrollTop = div.scrollHeight; }); }
+       function initUserChat(uid) { const q = query(collection(db, "chats", uid, "messages"), orderBy("createdAt", "asc")); onSnapshot(q, (snapshot) => { const div = document.getElementById('chat-messages'); div.innerHTML = '<div class="bg-blue-100 text-blue-800 p-2 rounded-lg rounded-tl-none self-start max-w-[85%] text-xs">Shop chào bạn! Cần giúp gì không ạ?</div>'; snapshot.forEach(d => { const m = d.data(); const cls = m.sender === 'user' ? "bg-brand-600 text-white self-end rounded-tr-none" : "bg-white border border-slate-200 text-slate-800 self-start rounded-tl-none"; div.innerHTML += `<div class="${cls} p-2 rounded-lg max-w-[85%] break-words text-xs shadow-sm">${sanitizeText(m.text)}</div>`; }); div.scrollTop = div.scrollHeight; }); }
         window.sendUserChat = async (e) => { e.preventDefault(); const inp = document.getElementById('chat-input'); const text = inp.value.trim(); if(!text) return; const batch = writeBatch(db); batch.set(doc(collection(db, "chats", currentUser.uid, "messages")), { text, sender: 'user', createdAt: serverTimestamp() }); batch.set(doc(db, "chats", currentUser.uid), { userEmail: currentUser.email, lastMessage: text, lastMessageTime: serverTimestamp(), userId: currentUser.uid }, { merge: true }); await batch.commit(); sendNotification('admin', `Tin nhắn mới từ ${currentUser.email}: ${text.slice(0,80)}`, { title: 'Tin nhắn khách hàng', type: 'chat', refId: currentUser.uid }); inp.value = ""; };
-        function initAdminChatList() { const q = query(collection(db, "chats"), orderBy("lastMessageTime", "desc")); onSnapshot(q, (snapshot) => { const list = document.getElementById('admin-chat-list'); list.innerHTML = ""; snapshot.forEach(docSnap => { const data = docSnap.data(); const isActive = activeChatUserId === docSnap.id; const bgClass = isActive ? "bg-brand-50 border-l-4 border-brand-600" : "hover:bg-slate-50 border-l-4 border-transparent"; list.innerHTML += `<div onclick="openAdminChat('${docSnap.id}', '${data.userEmail}')" class="p-3 border-b cursor-pointer transition ${bgClass}"><div class="flex justify-between items-center"><span class="font-bold text-xs text-slate-800 truncate w-24">${data.userEmail.split('@')[0]}</span><span class="text-[10px] text-slate-400">${formatTime(data.lastMessageTime)}</span></div><div class="text-[11px] text-slate-500 truncate mt-1">${data.lastMessage || '...'}</div></div>`; }); }); }
-        window.openAdminChat = (userId, userEmail) => { if (!requireAdmin()) return; activeChatUserId = userId; document.getElementById('admin-chat-header').innerText = `Chat: ${userEmail.split('@')[0]}`; document.getElementById('admin-chat-form').classList.remove('hidden'); if (adminChatUnsub) adminChatUnsub(); const q = query(collection(db, "chats", userId, "messages"), orderBy("createdAt", "asc")); adminChatUnsub = onSnapshot(q, (snap) => { const div = document.getElementById('admin-chat-messages'); div.innerHTML = ""; snap.forEach(d => { const m = d.data(); const cls = m.sender !== 'user' ? "bg-brand-600 text-white self-end rounded-tr-none" : "bg-white border border-slate-200 text-slate-800 self-start rounded-tl-none"; div.innerHTML += `<div class="${cls} p-2 rounded-lg max-w-[85%] text-xs break-words shadow-sm">${m.text}</div>`; }); div.scrollTop = div.scrollHeight; }); };
+       function initAdminChatList() { const q = query(collection(db, "chats"), orderBy("lastMessageTime", "desc")); onSnapshot(q, (snapshot) => { const list = document.getElementById('admin-chat-list'); list.innerHTML = ""; snapshot.forEach(docSnap => { const data = docSnap.data(); const isActive = activeChatUserId === docSnap.id; const bgClass = isActive ? "bg-brand-50 border-l-4 border-brand-600" : "hover:bg-slate-50 border-l-4 border-transparent"; list.innerHTML += `<div onclick="openAdminChat('${docSnap.id}', '${data.userEmail}')" class="p-3 border-b cursor-pointer transition ${bgClass}"><div class="flex justify-between items-center"><span class="font-bold text-xs text-slate-800 truncate w-24">${data.userEmail.split('@')[0]}</span><span class="text-[10px] text-slate-400">${formatTime(data.lastMessageTime)}</span></div><div class="text-[11px] text-slate-500 truncate mt-1">${sanitizeText(data.lastMessage || '...')}</div></div>`; }); }); }
+      window.openAdminChat = (userId, userEmail) => { if (!requireAdmin()) return; activeChatUserId = userId; document.getElementById('admin-chat-header').innerText = `Chat: ${userEmail.split('@')[0]}`; document.getElementById('admin-chat-form').classList.remove('hidden'); if (adminChatUnsub) adminChatUnsub(); const q = query(collection(db, "chats", userId, "messages"), orderBy("createdAt", "asc")); adminChatUnsub = onSnapshot(q, (snap) => { const div = document.getElementById('admin-chat-messages'); div.innerHTML = ""; snap.forEach(d => { const m = d.data(); const cls = m.sender !== 'user' ? "bg-brand-600 text-white self-end rounded-tr-none" : "bg-white border border-slate-200 text-slate-800 self-start rounded-tl-none"; div.innerHTML += `<div class="${cls} p-2 rounded-lg max-w-[85%] text-xs break-words shadow-sm">${sanitizeText(m.text)}</div>`; }); div.scrollTop = div.scrollHeight; }); };
         window.sendAdminChat = async (e) => { e.preventDefault(); if (!requireAdmin()) return; if (!activeChatUserId) return; const inp = document.getElementById('admin-chat-input'); const text = inp.value.trim(); if (!text) return; const batch = writeBatch(db); batch.set(doc(collection(db, "chats", activeChatUserId, "messages")), { text, sender: 'admin', createdAt: serverTimestamp() }); batch.update(doc(db, "chats", activeChatUserId), { lastMessage: `Admin: ${text}`, lastMessageTime: serverTimestamp() }); await batch.commit(); sendNotification(activeChatUserId, `Admin phản hồi: ${text.slice(0,100)}`, { title: 'Shop đã phản hồi', type: 'chat', refId: activeChatUserId }); inp.value = ""; };
 
         function initAdminVouchers() { onSnapshot(collection(db, "vouchers"), (snap) => { const list = document.getElementById('voucher-list'); list.innerHTML = snap.empty ? '<tr><td colspan="5" class="p-4 text-center text-slate-400">Chưa có mã nào</td></tr>' : snap.docs.map(d => { const v = d.data(); return `<tr class="border-b hover:bg-slate-50"><td class="p-3 font-bold text-brand-600">${v.code}</td><td class="p-3">${v.type === 'percent' ? 'Giảm %' : (v.type === 'freeship' ? 'Free Ship' : 'Trừ tiền')}</td><td class="p-3 font-mono">${v.value.toLocaleString()}</td><td class="p-3 font-bold ${v.quantity <= 0 ? 'text-red-500' : 'text-green-600'}">${v.quantity}</td><td class="p-3 text-right"><button onclick="handleDeleteVoucher('${d.id}')" class="text-red-500 hover:bg-red-50 p-2 rounded transition"><i class="fa-solid fa-trash"></i></button></td></tr>`; }).join(''); }); }
@@ -3393,81 +3690,102 @@ window.handleSpinGacha = async () => {
     const btn = document.getElementById('btn-spin');
     const res = document.getElementById('gacha-result');
     btn.disabled = true;
-    res.innerHTML = '<span class="text-slate-500"><i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra lượt quay...</span>';
+    res.innerHTML = '<span class="text-slate-500"><i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý lượt quay...</span>';
+    
     try {
         const userRef = doc(db, "users", currentUser.uid);
         const userSnap = await getDoc(userRef);
         if (!userSnap.exists()) throw new Error('Không tìm thấy dữ liệu người dùng.');
+        
         const userData = userSnap.data();
         const weekKey = getWeekKey();
         const extraSpins = Number(userData.spins || 0);
         const canUseWeekly = userData.lastGachaWeek !== weekKey;
+        
         let spinSource = null;
         if (canUseWeekly) spinSource = 'weekly';
         else if (extraSpins > 0) spinSource = 'extra';
+        
         if (!spinSource) {
             res.innerHTML = `<span class="text-red-500 font-bold"><i class="fa-solid fa-clock"></i> Hết lượt quay tuần này.<br>Nạp ví mỗi 5.000đ để nhận thêm 1 lượt.</span>`;
             btn.disabled = false;
             updateGachaStatusFromUser(userData);
             return;
         }
+
         const items = await loadGachaItems();
         applyGachaWheel(items);
         const { item: selectedItem, index } = pickGachaItem(items);
+
+        // --- BƯỚC QUAN TRỌNG: LƯU DATABASE NGAY LẬP TỨC TRƯỚC KHI ANIMATION CHẠY ---
+      let resultHtml = '';
+        let rewardMsg = '';
+        let uniqueCode = null;
+
+        await runTransaction(db, async (transaction) => {
+            const freshSnap = await transaction.get(userRef);
+            const freshData = freshSnap.data();
+            const currentExtra = Number(freshData.spins || 0);
+            const isWeeklyAvailable = freshData.lastGachaWeek !== weekKey;
+            
+            // Check lại an toàn trong transaction
+            if (!isWeeklyAvailable && currentExtra <= 0) throw new Error("Hết lượt quay!");
+
+            const updates = { updatedAt: serverTimestamp(), lastGachaAt: serverTimestamp() };
+            if (spinSource === 'weekly') updates.lastGachaWeek = weekKey;
+            else updates.spins = increment(-1);
+            
+            if (selectedItem.type === 'point') {
+                updates.points = increment(selectedItem.value);
+                updates.weekScore = increment(selectedItem.value);
+                updates.monthScore = increment(selectedItem.value);
+                resultHtml = `<div class="text-yellow-500 font-black text-2xl animate-bounce"><i class="fa-solid fa-star"></i> +${selectedItem.value} Điểm</div>`;
+                rewardMsg = `Nhận ${selectedItem.value} Điểm`;
+            } else if (selectedItem.type === 'exp') {
+                updates["pet.currentXp"] = increment(selectedItem.value);
+                resultHtml = `<div class="text-green-500 font-black text-2xl animate-bounce"><i class="fa-solid fa-dragon"></i> +${selectedItem.value} EXP Pet</div>`;
+                rewardMsg = `Nhận ${selectedItem.value} EXP Pet`;
+            } else if (selectedItem.type === 'stone') {
+                updates.evolutionStones = increment(selectedItem.value);
+                resultHtml = `<div class="text-purple-500 font-black text-2xl animate-bounce"><i class="fa-solid fa-bolt"></i> +${selectedItem.value} Đá Tiến Hóa</div>`;
+                rewardMsg = `Nhận ${selectedItem.value} Đá Tiến Hóa`;
+            } else if (selectedItem.type === 'voucher') {
+                uniqueCode = `GACHA${Date.now().toString().slice(-6)}${Math.floor(Math.random()*90+10)}`;
+                const vRef = doc(collection(db, "vouchers"));
+                transaction.set(vRef, { code: uniqueCode, type: 'percent', value: selectedItem.value, quantity: 1, ownerId: currentUser.uid, createdAt: serverTimestamp(), source: 'gacha' });
+                resultHtml = `<div class="animate-bounce"><div class="text-brand-600 font-black text-xl">Trúng ${sanitizeText(selectedItem.name)}</div><div class="mt-2 bg-white p-3 rounded-xl border border-pink-100 font-mono text-lg font-black select-all cursor-pointer text-slate-800 shadow-sm" onclick="navigator.clipboard.writeText('${uniqueCode}'); showToast('Đã copy mã')">${uniqueCode} <i class="fa-regular fa-copy text-xs ml-1 text-slate-400"></i></div><p class="text-[10px] text-slate-400 mt-1">Mã voucher 1 lần đã được lưu vào túi của bạn.</p></div>`;
+                rewardMsg = `Nhận Voucher ${selectedItem.value}%`;
+            } else {
+                resultHtml = `<span class="text-slate-500 font-black">${sanitizeText(selectedItem.name || 'Chúc may mắn lần sau')} <i class="fa-regular fa-face-sad-tear"></i></span>`;
+                rewardMsg = 'Trượt rồi!';
+            }
+            
+            transaction.update(userRef, updates);
+            const logRef = doc(collection(db, "users", currentUser.uid, "gacha_logs"));
+            transaction.set(logRef, { reward: selectedItem.name, type: selectedItem.type, value: selectedItem.value || 0, code: uniqueCode, spinSource, weekKey, createdAt: serverTimestamp() });
+        });
+
+        // --- BƯỚC CHẠY GIAO DIỆN SAU KHI ĐÃ LƯU AN TOÀN ---
         res.innerHTML = spinSource === 'weekly' ? '<span class="text-emerald-600 font-bold">Đang dùng lượt miễn phí tuần...</span>' : `<span class="text-pink-600 font-bold">Đang dùng lượt nạp ví. Còn trước khi quay: ${extraSpins}</span>`;
         spinWheelToIndex(items, index);
+        
+        // Đợi quay xong mới hiện phần thưởng
         setTimeout(async () => {
-            try {
-                const batch = writeBatch(db);
-                const updates = { updatedAt: serverTimestamp(), lastGachaAt: serverTimestamp() };
-                if (spinSource === 'weekly') updates.lastGachaWeek = weekKey;
-                else updates.spins = increment(-1);
-                let resultHtml = '';
-                let rewardMsg = '';
-                let uniqueCode = null;
-                if (selectedItem.type === 'point') {
-                    updates.points = increment(selectedItem.value);
-                    updates.weekScore = increment(selectedItem.value);
-                    updates.monthScore = increment(selectedItem.value);
-                    resultHtml = `<div class="text-yellow-500 font-black text-2xl animate-bounce"><i class="fa-solid fa-star"></i> +${selectedItem.value} Điểm</div>`;
-                    rewardMsg = `Nhận ${selectedItem.value} Điểm`;
-                } else if (selectedItem.type === 'exp') {
-                    updates["pet.currentXp"] = increment(selectedItem.value);
-                    resultHtml = `<div class="text-green-500 font-black text-2xl animate-bounce"><i class="fa-solid fa-dragon"></i> +${selectedItem.value} EXP Pet</div>`;
-                    rewardMsg = `Nhận ${selectedItem.value} EXP Pet`;
-                } else if (selectedItem.type === 'stone') {
-                    updates.evolutionStones = increment(selectedItem.value);
-                    resultHtml = `<div class="text-purple-500 font-black text-2xl animate-bounce"><i class="fa-solid fa-bolt"></i> +${selectedItem.value} Đá Tiến Hóa</div>`;
-                    rewardMsg = `Nhận ${selectedItem.value} Đá Tiến Hóa`;
-                } else if (selectedItem.type === 'voucher') {
-                    uniqueCode = `GACHA${Date.now().toString().slice(-6)}${Math.floor(Math.random()*90+10)}`;
-                    batch.set(doc(collection(db, "vouchers")), { code: uniqueCode, type: 'percent', value: selectedItem.value, quantity: 1, ownerId: currentUser.uid, createdAt: serverTimestamp(), source: 'gacha' });
-                    resultHtml = `<div class="animate-bounce"><div class="text-brand-600 font-black text-xl">Trúng ${sanitizeText(selectedItem.name)}</div><div class="mt-2 bg-white p-3 rounded-xl border border-pink-100 font-mono text-lg font-black select-all cursor-pointer text-slate-800 shadow-sm" onclick="navigator.clipboard.writeText('${uniqueCode}'); showToast('Đã copy mã')">${uniqueCode} <i class="fa-regular fa-copy text-xs ml-1 text-slate-400"></i></div><p class="text-[10px] text-slate-400 mt-1">Mã voucher 1 lần đã được tạo.</p></div>`;
-                    rewardMsg = `Nhận Voucher ${selectedItem.value}%`;
-                } else {
-                    resultHtml = `<span class="text-slate-500 font-black">${sanitizeText(selectedItem.name || 'Chúc may mắn lần sau')} <i class="fa-regular fa-face-sad-tear"></i></span>`;
-                    rewardMsg = 'Trượt rồi!';
-                }
-                batch.update(userRef, updates);
-                batch.set(doc(collection(db, "users", currentUser.uid, "gacha_logs")), { reward: selectedItem.name, type: selectedItem.type, value: selectedItem.value || 0, code: uniqueCode, spinSource, weekKey, createdAt: serverTimestamp() });
-                await batch.commit();
-                res.innerHTML = resultHtml;
-                if (selectedItem.type !== 'empty') showToast(`🎉 ${rewardMsg}`);
-                const freshSnap = await getDoc(userRef);
-                if (freshSnap.exists()) updateGachaStatusFromUser(freshSnap.data());
-            } catch (e) {
-                console.error(e);
-                res.innerHTML = `<span class="text-red-500 font-bold">Lỗi ghi phần thưởng: ${sanitizeText(e.message)}</span>`;
-                showToast('Lỗi gacha: ' + e.message, 'error');
-            } finally {
-                btn.disabled = false;
-            }
+            res.innerHTML = resultHtml;
+            if (selectedItem.type !== 'empty') showToast(`🎉 ${rewardMsg}`);
+            
+            // Lấy lại data mới nhất để update UI (số lượt còn lại)
+            const freshSnap = await getDoc(userRef);
+            if (freshSnap.exists()) updateGachaStatusFromUser(freshSnap.data());
+            
+            btn.disabled = false;
         }, 4100);
+
     } catch (err) {
         console.error(err);
-        res.innerText = 'Lỗi kết nối.';
+        res.innerHTML = `<span class="text-red-500 font-bold">Lỗi xử lý: ${sanitizeText(err.message)}</span>`;
+        showToast('Lỗi gacha: ' + err.message, 'error');
         btn.disabled = false;
-        showToast(err.message, 'error');
     }
 };
 
@@ -3579,6 +3897,113 @@ function initNotificationListener(role, uid) {
             document.getElementById('toast-container').appendChild(t);
             setTimeout(() => t.remove(), 4200);
         }
+        // Khóa mọi nút submit trong 2 giây sau khi bấm để chống spam Double-Click
+document.addEventListener('submit', (e) => {
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn && !btn.disabled) {
+        const oldContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Chờ chút...';
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = oldContent;
+        }, 2000);
+    }
+});
+// Xóa link nếu khách chọn file
+        document.getElementById('order-file')?.addEventListener('change', async function(e) {
+            document.getElementById('order-drive-link').value = ''; 
+            const file = e.target.files[0];
+            if(!file) return;
+            currentFileObj = file;
+            
+            const previewBox = document.getElementById('auto-quote-preview');
+            const pageEl = document.getElementById('preview-pages');
+            const printPriceEl = document.getElementById('preview-print-price');
+            const shipPriceEl = document.getElementById('preview-ship-price');
+            const totalEl = document.getElementById('preview-total-price');
+            const warningEl = document.getElementById('preview-warning');
+            
+            previewBox.classList.remove('hidden');
+            pageEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...';
+            printPriceEl.innerText = '...';
+            totalEl.innerText = 'Đang tính toán...';
+            warningEl.classList.add('hidden');
+
+            try {
+                let pageCount = 0;
+
+                // NẾU ADMIN TẮT TÍNH NĂNG TỰ ĐỘNG BÁO GIÁ
+                if (!AUTO_QUOTE_CONFIG.enableAuto) {
+                    pageCount = 0;
+                    warningEl.classList.remove('hidden');
+                    warningEl.innerText = "* Admin đang tạm tắt tính năng tự động báo giá. Đơn hàng sẽ được báo giá thủ công.";
+                } else {
+                    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const pdf = await window.pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                        pageCount = pdf.numPages;
+                    } 
+                    else if (file.name.toLowerCase().endsWith('.docx')) {
+                        warningEl.classList.remove('hidden');
+                        warningEl.innerText = "* File DOCX/DOC chỉ đếm trang tương đối dựa trên số chữ. Nếu số lượng sai lệch nhiều, Admin sẽ cập nhật lại sau.";
+                        const arrayBuffer = await file.arrayBuffer();
+                        const result = await mammoth.extractRawText({arrayBuffer: arrayBuffer});
+                        const text = result.value;
+                        pageCount = Math.max(1, Math.ceil(text.length / 1800));
+                    } 
+                    else if (file.name.toLowerCase().endsWith('.doc')) {
+                        warningEl.classList.remove('hidden');
+                        warningEl.innerText = "* Định dạng cũ không hỗ trợ đếm tự động. Admin sẽ báo giá thủ công.";
+                        pageCount = 0; 
+                    } 
+                    else {
+                        throw new Error("Định dạng file không hỗ trợ. Vui lòng dùng PDF, DOCX.");
+                    }
+                }
+
+                currentCalculatedPages = pageCount;
+                
+                if (pageCount > 0) {
+                    currentCalculatedPrintPrice = pageCount * AUTO_QUOTE_CONFIG.pricePerPage;
+                    currentCalculatedShipPrice = currentCalculatedPrintPrice >= AUTO_QUOTE_CONFIG.freeShipFrom ? 0 : AUTO_QUOTE_CONFIG.defaultShip;
+                    
+                    pageEl.innerText = `${pageCount} trang`;
+                    printPriceEl.innerText = fmtVND(currentCalculatedPrintPrice);
+                    shipPriceEl.innerText = currentCalculatedShipPrice === 0 ? "Freeship" : fmtVND(currentCalculatedShipPrice);
+                    totalEl.innerText = fmtVND(currentCalculatedPrintPrice + currentCalculatedShipPrice);
+                } else {
+                    pageEl.innerText = `Chờ Admin đếm`;
+                    printPriceEl.innerText = `...`;
+                    shipPriceEl.innerText = `...`;
+                    totalEl.innerText = `Sẽ do Admin báo giá`;
+                    currentCalculatedPrintPrice = 0;
+                    currentCalculatedShipPrice = 0;
+                }
+                
+            } catch (err) {
+                console.error(err);
+                pageEl.innerText = "Lỗi đọc file";
+                totalEl.innerText = "Sẽ do Admin báo giá";
+                currentCalculatedPages = 0;
+                currentCalculatedPrintPrice = 0;
+                currentCalculatedShipPrice = 0;
+                showToast(err.message, 'error');
+            }
+        });
+
+        // Xóa file nếu khách dán link
+        document.getElementById('order-drive-link')?.addEventListener('input', function(e) {
+            if (e.target.value.trim() !== '') {
+                document.getElementById('order-file').value = '';
+                currentFileObj = null;
+                currentCalculatedPages = 0;
+                currentCalculatedPrintPrice = 0;
+                currentCalculatedShipPrice = 0;
+                document.getElementById('auto-quote-preview').classList.add('hidden');
+            }
+        });
+            
    </script>
 </body>
 </html>
