@@ -6,6 +6,7 @@
     <title>PrintShop Pro - Ultimate V2</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -2771,12 +2772,21 @@ window.handleAdminGift = async (e) => {
                 reader.onerror = (error) => reject(error);
             });
         };
-      window.handleCreateOrder = async (e) => {
+     window.handleCreateOrder = async (e) => {
             e.preventDefault();
             const driveLinkInput = document.getElementById('order-drive-link').value.trim();
             
             if (currentFilesArray.length === 0 && !driveLinkInput) {
                 return showToast("Vui lòng tải file lên HOẶC dán link Google Drive!", "error");
+            }
+
+            // CHỐT CHẶN: Tính tổng dung lượng, nếu > 50MB thì chặn vì Telegram không nhận
+            let totalUploadSize = 0;
+            for (let file of currentFilesArray) {
+                totalUploadSize += file.size;
+            }
+            if (totalUploadSize > 50 * 1024 * 1024) {
+                return showToast("Tổng dung lượng các file vượt quá 50MB. Vui lòng chia nhỏ đơn hoặc dán Link Drive!", "error");
             }
             
             const btn = e.target.querySelector('button[type="submit"]');
@@ -2784,21 +2794,11 @@ window.handleAdminGift = async (e) => {
             btn.disabled = true;
 
             try {
-                // 1. UPLOAD TUẦN TỰ TỪNG FILE LÊN DRIVE VÀ GỘP LINK CÁCH NHAU BẰNG DẤU PHẨY
-                let finalDriveUrl = "";
-                if (currentFilesArray.length > 0) {
-                    const uploadedUrls = [];
-                    for (let i = 0; i < currentFilesArray.length; i++) {
-                        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải ${i + 1}/${currentFilesArray.length} file lên Drive...`;
-                        const url = await uploadFileToAdminDrive(currentFilesArray[i]);
-                        uploadedUrls.push(url);
-                    }
-                    finalDriveUrl = uploadedUrls.join(","); 
-                } else {
-                    finalDriveUrl = driveLinkInput;
-                }
+                // 1. TẠO ID ĐƠN HÀNG TRƯỚC
+                const newOrderRef = doc(collection(db, "orders"));
+                const shortOrderId = newOrderRef.id.slice(0,6);
                 
-                // 2. CHECK VOUCHER NẾU KHÁCH CÓ NHẬP
+                // 2. CHECK VOUCHER
                 const voucherCode = document.getElementById('order-voucher').value.trim().toUpperCase() || null;
                 let disc = 0;
                 let voucherIdToUpdate = null;
@@ -2824,9 +2824,10 @@ window.handleAdminGift = async (e) => {
                     }
                 }
 
-                // 3. TẠO PAYLOAD ĐƠN HÀNG
+                // 3. TẠO PAYLOAD
                 const finalPrice = Math.max(0, currentCalculatedPrintPrice + currentCalculatedShipPrice - disc);
                 const finalStatus = currentCalculatedPages > 0 ? 'pending_payment' : 'pending_quote';
+                const finalDriveUrl = currentFilesArray.length > 0 ? "TELEGRAM_FILES" : driveLinkInput;
 
                 const orderPayload = {
                     userId: currentUser.uid,
@@ -2845,19 +2846,18 @@ window.handleAdminGift = async (e) => {
                 };
 
                 const batch = writeBatch(db);
-                const newOrderRef = doc(collection(db, "orders"));
                 batch.set(newOrderRef, orderPayload);
                 if (voucherIdToUpdate) {
                     batch.update(doc(db, "vouchers", voucherIdToUpdate), { quantity: currentQty - 1 });
                 }
                 await batch.commit();
 
-                // 4. BẮN THÔNG BÁO WEB VÀ TELEGRAM (SIÊU CHI TIẾT)
-                sendNotification('admin', `Có đơn in mới #${newOrderRef.id.slice(0,6)} từ ${currentUser.email}`, { title: 'Đơn hàng mới', type: 'order', refId: newOrderRef.id });
+                // 4. BẮN TIN NHẮN TÓM TẮT ĐƠN HÀNG VÀO TELEGRAM
+                sendNotification('admin', `Có đơn in mới #${shortOrderId} từ ${currentUser.email}`, { title: 'Đơn hàng mới', type: 'order', refId: newOrderRef.id });
                 
                 let teleMsg = `🚨 <b>ĐƠN ĐẶT IN MỚI TỪ WEB!</b>\n`;
                 teleMsg += `👤 Khách: ${currentUser.displayName}\n`;
-                teleMsg += `🏷 Mã đơn: #${newOrderRef.id.slice(0,6)}\n`;
+                teleMsg += `🏷 Mã đơn: #${shortOrderId}\n`;
                 if (currentCalculatedPages > 0) {
                     teleMsg += `📄 Tổng số trang: <b>${currentCalculatedPages} trang (${currentFilesArray.length} file)</b>\n`;
                     teleMsg += `🖨 Tiền in: ${fmtVND(currentCalculatedPrintPrice)}\n`;
@@ -2870,16 +2870,42 @@ window.handleAdminGift = async (e) => {
                     teleMsg += `📌 Trạng thái: Chờ Admin xem file & báo giá\n`;
                 }
                 teleMsg += `📝 Ghi chú: ${document.getElementById('order-note').value || 'Không có'}\n\n`;
-                
-                // Tách chuỗi link để xuất ra danh sách liên kết riêng biệt trên bot Telegram
-                String(finalDriveUrl || '').split(',').forEach((url, idx) => {
-                    teleMsg += `<a href="${url.trim()}">👉 BẤM LẤY FILE IN ${idx + 1}</a>\n`;
-                });
 
-                window.sendTelegramAdmin(teleMsg);
-                showToast("Đã tải toàn bộ file & tạo đơn thành công!");
+                if (driveLinkInput) {
+                    teleMsg += `<a href="${driveLinkInput}">👉 BẤM VÀO ĐÂY ĐỂ MỞ LINK DRIVE</a>\n`;
+                } else if (currentFilesArray.length > 0) {
+                    teleMsg += `📦 <i>Hệ thống đang nén và gửi 1 cục ZIP đính kèm phía dưới...</i>`;
+                }
                 
-                // 5. RESET FORM & LÀM SẠCH BIẾN CHỐNG LỖI ĐƠN TIẾP THEO
+                await window.sendTelegramAdmin(teleMsg);
+
+                // 5. NÉN GỘP TẤT CẢ THÀNH 1 FILE ZIP RỒI GỬI QUA TELEGRAM
+                if (currentFilesArray.length > 0) {
+                    btn.innerHTML = `<i class="fa-solid fa-file-zipper fa-bounce mr-2"></i> Đang nén ${currentFilesArray.length} file thành ZIP...`;
+                    
+                    // Khởi tạo và nén file
+                    const zip = new JSZip();
+                    for (let i = 0; i < currentFilesArray.length; i++) {
+                        zip.file(currentFilesArray[i].name, currentFilesArray[i]);
+                    }
+                    const zipBlob = await zip.generateAsync({ type: "blob" });
+                    const zipFile = new File([zipBlob], `DonIn_${shortOrderId}_${currentFilesArray.length}files.zip`, { type: "application/zip" });
+
+                    btn.innerHTML = `<i class="fa-solid fa-paper-plane fa-bounce mr-2"></i> Đang gửi cục ZIP sang Telegram...`;
+                    
+                    const telegramUploadUrl = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument`;
+                    const formData = new FormData();
+                    formData.append('chat_id', TELEGRAM_CHAT_ID);
+                    formData.append('document', zipFile);
+                    formData.append('caption', `📦 [GỘP ZIP] Đơn #${shortOrderId}\n📑 Bao gồm: ${currentFilesArray.length} file\n👤 Khách: ${currentUser.email.split('@')[0]}\n⬇️ Tải 1 cục này về giải nén là xong!`);
+
+                    const res = await fetch(telegramUploadUrl, { method: 'POST', body: formData });
+                    if (!res.ok) throw new Error("Gửi file qua Telegram thất bại!");
+                }
+
+                showToast("Đã gửi file & tạo đơn thành công!");
+                
+                // 6. RESET FORM
                 e.target.reset();
                 currentFilesArray = [];
                 document.getElementById('order-drive-link').value = '';
