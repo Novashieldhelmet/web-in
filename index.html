@@ -854,36 +854,63 @@
                                 <div class="p-3 rounded-xl bg-blue-50 border border-blue-100"><b class="text-blue-700">2. Báo giá nhanh:</b> admin bấm nút tia sét ở từng đơn để nhập số trang, hệ thống tự điền tiền in/ship.</div>
                                 <div class="p-3 rounded-xl bg-purple-50 border border-purple-100"><b class="text-purple-700">3. Nhắc thanh toán tự động:</b> quét đơn chờ thanh toán quá hạn và gửi thông báo tức thời cho khách.</div>
                             </div>
+                            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mt-5 mb-5 mx-4 md:mx-0">
+
+                        <div class="flex items-center justify-between mb-4 border-b pb-2">
+
+                            <h3 class="font-bold text-slate-800"><i class="fa-solid fa-calculator text-brand-600 mr-1"></i> Cấu hình Báo giá & Vận chuyển</h3>
+
+                            <label class="relative inline-flex items-center cursor-pointer">
+
+                                <input type="checkbox" id="admin-toggle-autoquote" class="sr-only peer" checked onchange="saveSystemConfig()">
+
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+
+                                <span class="ml-3 text-sm font-bold text-slate-700">Bật Auto Đếm Trang</span>
+
+                            </label>
+
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                            <div>
+
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Giá 1 tờ (VNĐ)</label>
+
+                                <input type="number" id="admin-price-per-page" class="w-full p-2 border rounded-lg bg-slate-50 font-bold text-brand-600" value="350">
+
+                            </div>
+
+                            <div>
+
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Phí Ship mặc định (VNĐ)</label>
+
+                                <input type="number" id="admin-default-ship" class="w-full p-2 border rounded-lg bg-slate-50 font-bold" value="15000">
+
+                            </div>
+
+                            <div>
+
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Freeship cho đơn từ (VNĐ)</label>
+
+                                <input type="number" id="admin-free-ship-from" class="w-full p-2 border rounded-lg bg-slate-50 font-bold" value="150000">
+
+                            </div>
+
+                        </div>
+
+                        <div class="mt-4 flex justify-end">
+
+                            <button onclick="saveSystemConfig()" class="bg-brand-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-brand-700 shadow-sm active:scale-95"><i class="fa-solid fa-save mr-1"></i> Lưu Cấu Hình</button>
+
+                        </div>
+
+                    </div>
                         </div>
                     </div>
                 </div>
-<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mt-5 mb-5 mx-4 md:mx-0">
-                        <div class="flex items-center justify-between mb-4 border-b pb-2">
-                            <h3 class="font-bold text-slate-800"><i class="fa-solid fa-calculator text-brand-600 mr-1"></i> Cấu hình Báo giá & Vận chuyển</h3>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="admin-toggle-autoquote" class="sr-only peer" checked onchange="saveSystemConfig()">
-                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                <span class="ml-3 text-sm font-bold text-slate-700">Bật Auto Đếm Trang</span>
-                            </label>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-1">Giá 1 tờ (VNĐ)</label>
-                                <input type="number" id="admin-price-per-page" class="w-full p-2 border rounded-lg bg-slate-50 font-bold text-brand-600" value="350">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-1">Phí Ship mặc định (VNĐ)</label>
-                                <input type="number" id="admin-default-ship" class="w-full p-2 border rounded-lg bg-slate-50 font-bold" value="15000">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-1">Freeship cho đơn từ (VNĐ)</label>
-                                <input type="number" id="admin-free-ship-from" class="w-full p-2 border rounded-lg bg-slate-50 font-bold" value="150000">
-                            </div>
-                        </div>
-                        <div class="mt-4 flex justify-end">
-                            <button onclick="saveSystemConfig()" class="bg-brand-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-brand-700 shadow-sm active:scale-95"><i class="fa-solid fa-save mr-1"></i> Lưu Cấu Hình</button>
-                        </div>
-                    </div>
+
                 <div id="view-admin-chat" class="view-section max-w-6xl mx-auto hidden fade-in h-[calc(100vh-8rem)] md:h-[80vh]"><h2 class="text-xl md:text-2xl font-bold mb-4">Hỗ trợ khách hàng</h2><div class="bg-white border rounded-xl shadow-sm flex flex-col md:flex-row h-full overflow-hidden"><div class="w-full md:w-1/3 border-b md:border-b-0 md:border-r bg-slate-50 flex flex-col h-1/3 md:h-auto"><div class="p-3 border-b font-bold text-slate-600 text-sm">Khách hàng</div><div id="admin-chat-list" class="flex-1 overflow-y-auto"></div></div><div class="w-full md:w-2/3 flex flex-col bg-white h-2/3 md:h-auto" id="admin-chat-area"><div class="p-3 border-b flex justify-between items-center bg-slate-50 h-12 md:h-14 shrink-0"><span id="admin-chat-header" class="font-bold text-brand-700 text-sm truncate">Chọn khách hàng</span></div><div id="admin-chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50 text-sm"><div class="text-center text-slate-400 mt-10">Chưa chọn cuộc hội thoại nào</div></div><form onsubmit="sendAdminChat(event)" class="p-2 md:p-3 border-t flex gap-2 hidden shrink-0" id="admin-chat-form"><input id="admin-chat-input" type="text" class="flex-1 p-2 border rounded-lg text-sm" placeholder="Nhập tin nhắn..."><button type="submit" class="bg-brand-600 text-white p-2 px-4 rounded-lg"><i class="fa-solid fa-paper-plane"></i></button></form></div></div></div>
                 <div id="view-admin-vouchers" class="view-section max-w-4xl mx-auto hidden fade-in pb-10"><div class="flex justify-between items-center mb-6"><h2 class="text-xl font-bold">Mã Giảm Giá</h2><button onclick="document.getElementById('form-voucher-create').classList.toggle('hidden')" class="bg-green-600 text-white px-3 py-1.5 text-sm rounded hover:bg-green-700">+ Tạo</button></div><div id="form-voucher-create" class="bg-white p-4 rounded-xl shadow-sm mb-6 hidden border border-green-100"><form onsubmit="handleCreateVoucher(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3"><input type="text" id="v-code" required class="p-2 border rounded uppercase text-sm" placeholder="Mã (VD: TET)"><select id="v-type" class="p-2 border rounded text-sm"><option value="percent">Giảm %</option><option value="fixed">Trừ tiền</option><option value="freeship">Free Ship</option></select><input type="number" id="v-value" required class="p-2 border rounded text-sm" placeholder="Giá trị"><input type="number" id="v-qty" required class="p-2 border rounded text-sm" placeholder="SL"><button type="submit" class="md:col-span-4 bg-green-600 text-white py-2 rounded font-bold text-sm">Lưu</button></form></div><div class="bg-white rounded-xl shadow overflow-hidden overflow-x-auto"><table class="w-full text-left min-w-[500px]"><thead class="bg-slate-100 text-xs uppercase text-slate-500"><tr><th class="p-3">Mã</th><th class="p-3">Loại</th><th class="p-3">Giá trị</th><th class="p-3">SL</th><th class="p-3 text-right">Xóa</th></tr></thead><tbody id="voucher-list" class="text-sm"></tbody></table></div></div>
                <div id="view-admin-gacha" class="view-section max-w-6xl mx-auto hidden fade-in pb-10">
