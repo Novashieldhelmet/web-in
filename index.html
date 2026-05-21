@@ -1151,11 +1151,12 @@
     </div>
 
 
-   <script type="module">
+  <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { initializeFirestore , collection, addDoc, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDoc, setDoc, getDocs, writeBatch, increment, limit, deleteField, runTransaction} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+        
         // !!! CONFIG FIREBASE CỦA BẠN !!!
         const firebaseConfig = {
             apiKey: "AIzaSyAJasDp1jt-1WpmWcdSO7CMmm4XyOEdlxs",
@@ -1171,29 +1172,29 @@ import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/fireb
         const auth = getAuth(app);
         const googleProvider = new GoogleAuthProvider();
         googleProvider.setCustomParameters({ prompt: "select_account" });
-      const db = initializeFirestore(app, {});
-      // Hàm trợ giúp tải động thư viện khi có sự kiện (Lazy Loading)
-window.loadLibraryOnDemand = function(url, globalVar) {
-    if (window[globalVar]) return Promise.resolve();
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = url;
-        script.defer = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`Không thể tải thư viện: ${url}`));
-        document.body.appendChild(script);
-    });
-};
-const messaging = (() => { try { return getMessaging(app); } catch (e) { console.warn('Firebase Messaging không khả dụng trong môi trường này:', e?.message || e); return null; } })();
-// --- HỆ THỐNG GỬI MAIL TỰ ĐỘNG BẰNG GOOGLE APPS SCRIPT ---
-        // !!! QUAN TRỌNG: Thay link dưới đây bằng link Web App URL của ông !!!
+        const db = initializeFirestore(app, {});
+
+        // Hàm trợ giúp tải động thư viện khi có sự kiện (Lazy Loading)
+        window.loadLibraryOnDemand = function(url, globalVar) {
+            if (window[globalVar]) return Promise.resolve();
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.defer = true;
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error(`Không thể tải thư viện: ${url}`));
+                document.body.appendChild(script);
+            });
+        };
+
+        const messaging = (() => { try { return getMessaging(app); } catch (e) { console.warn('Firebase Messaging không khả dụng trong môi trường này:', e?.message || e); return null; } })();
+        
+        // --- HỆ THỐNG GỬI MAIL TỰ ĐỘNG BẰNG GOOGLE APPS SCRIPT ---
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzr5A4yGM-s4uWi1AkEvHQbEoSEigfCY7BPTDXgHP1tJhGkzLRTlG_YNPLZYBphunjmAw/exec"; 
 
-      window.sendMailAPI = async (toEmail, subject, htmlContent) => {
+        window.sendMailAPI = async (toEmail, subject, htmlContent) => {
             try {
-                // SỬA LỖI #16: Guard chuẩn, nếu email trống thì dừng ngay lập tức
                 if (!toEmail) return; 
-                
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1204,8 +1205,8 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                 console.error("Lỗi khi gọi API gửi mail: ", e);
             }
         };
+
         // --- HỆ THỐNG THÔNG BÁO CHO ADMIN QUA TELEGRAM ---
-        // !!! THAY TOKEN VÀ CHAT ID CỦA ÔNG VÀO ĐÂY !!!
         const TELEGRAM_TOKEN = "8948907523:AAESta00e-4RTYLErY4UmXpoHlPvqQyrgaE"; 
         const TELEGRAM_CHAT_ID = "8113060948";
 
@@ -1225,8 +1226,8 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                 console.error("Lỗi gửi Telegram: ", e);
             }
         };
+
         // --- HÀM HỖ TRỢ NÉN ẢNH ---
-       // Hàm nén ảnh có bộ phòng vệ bắt lỗi luồng dữ liệu (Sửa lỗi #17)
         const resizeImage = (file, maxWidth = 300) => {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -1254,11 +1255,13 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
             });
         };
 
+        const sanitizeText = (value = '') => String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        window.sanitizeText = sanitizeText; // Ép biến sạch vào cửa sổ toàn cục để chống lỗi hàm rỗng phía dưới
+
         const ADMIN_EMAIL = "phuvinhtrannguyen@gmail.com";
-       // --- Cấu hình mặc định giữ nguyên ---
         let currentUser = null;
         let currentSessionRole = null;
-        let lastInitedUid = null; // Khóa chống trùng lặp khi Firebase tự động làm mới Token định kỳ
+        let lastInitedUid = null; 
         let activeChatUserId = null; 
         let currentWalletBalance = 0;
         const MINING_CYCLE_MS = 30 * 60 * 1000;
@@ -1288,16 +1291,16 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
         const safeSetText = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
         const safeSetHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
         const safeSetSrc = (id, src) => { const el = document.getElementById(id); if (el) el.src = src; };
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-let currentCalculatedPages = 0;
-let currentCalculatedPrintPrice = 0;
-let currentCalculatedShipPrice = 0;
-let currentFilesArray = []; // Chuyển thành mảng lưu nhiều file
+
+        let currentCalculatedPages = 0;
+        let currentCalculatedPrintPrice = 0;
+        let currentCalculatedShipPrice = 0;
+        let currentFilesArray = []; 
         let currentNotificationTarget = null;
         let notificationDocsCache = [];
         let notificationInitialised = false;
         const BANK_INFO = { bin: "970436", accountNo: "1047262114", accountName: "TRAN NGUYEN PHU VINH", accountHolder: "Trần Nguyễn Phú Vinh", bankName: "VCB" };
-       let AUTO_QUOTE_CONFIG = { pricePerPage: 350, defaultShip: 15000, minPrint: 0, freeShipFrom: 150000, enableAuto: true };
+        let AUTO_QUOTE_CONFIG = { pricePerPage: 350, defaultShip: 15000, minPrint: 0, freeShipFrom: 150000, enableAuto: true };
 
         // Lắng nghe cấu hình hệ thống từ Firebase
         onSnapshot(doc(db, "config", "system"), (snap) => {
@@ -1389,7 +1392,7 @@ let currentFilesArray = []; // Chuyển thành mảng lưu nhiều file
         const maxPetFormForLevel = (level = 1) => Math.min(PET_FORM_NAMES.length - 1, Math.floor((Number(level) || 1) / 10));
 
         const fmtVND = (amount = 0) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(amount) || 0);
-        const sanitizeText = (value = '') => String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+       
         const getDocMillis = (ts) => ts?.toMillis ? ts.toMillis() : (ts?.toDate ? ts.toDate().getTime() : (ts ? new Date(ts).getTime() : 0));
         const makePaymentCode = (prefix = 'NAP') => `${prefix}${Date.now().toString().slice(-7)}${Math.floor(Math.random() * 90 + 10)}`;
         const transferContent = (code, email) => `${code} ${String(email || '').replace(/\s+/g, '').slice(0, 42)}`.toUpperCase();
@@ -2365,7 +2368,7 @@ if (Number.isNaN(last.getTime())) last = now;
 };
 
 // --- 2. CẬP NHẬT: TẢI LỊCH SỬ (Hiển thị mã code để copy) ---
-let historyUnsub = null;
+// historyUnsub đã được khai báo tập trung ở đầu module để tránh lỗi redeclare làm chết toàn bộ script.
 window.loadMiningHistory = () => {
     if (historyUnsub) historyUnsub(); 
     if (!currentUser) return;
@@ -3805,11 +3808,7 @@ Tài khoản nhận tiền: VCB ${BANK_INFO.accountNo} - ${BANK_INFO.accountHold
         };
 
         // --- TRIỆT TIÊU RÒ RỈ DỮ LIỆU ĐỘC LẬP (SỬA LỖI #4) ---
-        function initAdminUsers() {
-            if (!requireAdmin()) return;
-            // Bảo vệ chống tạo listener ma trùng lặp: Luồng nghe chính của Users đã được quản lý an toàn ở onAuthStateChanged
-            renderAdminUsersFromCache();
-        }
+        // initAdminUsers đã được định nghĩa một lần ở trên; không khai báo lại trong module vì sẽ làm toàn bộ script bị SyntaxError.
 
         function initAdminVouchers() { 
             if (adminVouchersUnsub) adminVouchersUnsub();
@@ -3923,7 +3922,7 @@ function applyGachaWheel(items = gachaConfigCache, selectedIndex = -1) {
     renderGachaWheelTo('admin-gacha-wheel-preview', normalized, selectedIndex);
     renderGachaPrizeList(normalized);
 }
-let gachaHistoryUnsub = null;
+// gachaHistoryUnsub đã được khai báo tập trung ở đầu module.
 window.loadGachaHistory = () => {
     if (gachaHistoryUnsub) gachaHistoryUnsub();
     if (!currentUser) return;
@@ -4289,7 +4288,7 @@ window.markAllNotificationsRead = async () => {
 };
 
 // 2. Hàm lắng nghe thông báo (Chạy khi login)
-let notifUnsub = null;
+// notifUnsub đã được khai báo tập trung ở đầu module.
 function initNotificationListener(role, uid) {
     if (notifUnsub) notifUnsub();
     currentNotificationTarget = role === 'admin' ? 'admin' : uid;
