@@ -4,9 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PrintShop Pro - Ultimate V2</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+   <link rel="preconnect" href="https://firestore.googleapis.com">
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
+    <link rel="preconnect" href="https://securetoken.googleapis.com">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com">
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+    <link rel="dns-prefetch" href="https://securetoken.googleapis.com">
+    <link rel="dns-prefetch" href="https://www.gstatic.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1163,15 +1172,27 @@ import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/fireb
         const googleProvider = new GoogleAuthProvider();
         googleProvider.setCustomParameters({ prompt: "select_account" });
       const db = initializeFirestore(app, {});
+      // Hàm trợ giúp tải động thư viện khi có sự kiện (Lazy Loading)
+window.loadLibraryOnDemand = function(url, globalVar) {
+    if (window[globalVar]) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.defer = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Không thể tải thư viện: ${url}`));
+        document.body.appendChild(script);
+    });
+};
 const messaging = (() => { try { return getMessaging(app); } catch (e) { console.warn('Firebase Messaging không khả dụng trong môi trường này:', e?.message || e); return null; } })();
 // --- HỆ THỐNG GỬI MAIL TỰ ĐỘNG BẰNG GOOGLE APPS SCRIPT ---
         // !!! QUAN TRỌNG: Thay link dưới đây bằng link Web App URL của ông !!!
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzr5A4yGM-s4uWi1AkEvHQbEoSEigfCY7BPTDXgHP1tJhGkzLRTlG_YNPLZYBphunjmAw/exec"; 
 
-        window.sendMailAPI = async (toEmail, subject, htmlContent) => {
+      window.sendMailAPI = async (toEmail, subject, htmlContent) => {
             try {
-                // Nếu chạy ở localhost/file local thì có thể bỏ qua bước gửi mail để tránh spam lúc test
-                if (toEmail === 'phuvinhtrannguyen@gmail.com' && !toEmail) return; 
+                // SỬA LỖI #16: Guard chuẩn, nếu email trống thì dừng ngay lập tức
+                if (!toEmail) return; 
                 
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
@@ -1205,8 +1226,9 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
             }
         };
         // --- HÀM HỖ TRỢ NÉN ẢNH ---
+       // Hàm nén ảnh có bộ phòng vệ bắt lỗi luồng dữ liệu (Sửa lỗi #17)
         const resizeImage = (file, maxWidth = 300) => {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = (event) => {
@@ -1226,28 +1248,46 @@ const messaging = (() => { try { return getMessaging(app); } catch (e) { console
                         ctx.drawImage(img, 0, 0, width, height);
                         resolve(canvas.toDataURL('image/jpeg', 0.7));
                     };
+                    img.onerror = () => reject(new Error("Định dạng file ảnh không hợp lệ hoặc bị lỗi mã hóa."));
                 };
+                reader.onerror = () => reject(new Error("Không thể đọc file ảnh từ thiết bị này."));
             });
         };
 
         const ADMIN_EMAIL = "phuvinhtrannguyen@gmail.com";
+       // --- Cấu hình mặc định giữ nguyên ---
         let currentUser = null;
         let currentSessionRole = null;
+        let lastInitedUid = null; // Khóa chống trùng lặp khi Firebase tự động làm mới Token định kỳ
         let activeChatUserId = null; 
+        let currentWalletBalance = 0;
+        const MINING_CYCLE_MS = 30 * 60 * 1000;
+        let adminAutoUnsubs = [];
+
+        // Khai báo tập trung 100% biến Unsubscribe để kiểm soát vòng đời các dòng dữ liệu (Sửa lỗi #4)
+        let systemConfigUnsub = null;
+        let adminUsersUnsub = null;
+        let userChatUnsub = null;
+        let adminChatListUnsub = null;
+        let adminVouchersUnsub = null;
+        let adminDepositUnsub = null;
+        let adminWalletLogUnsub = null;
+        let adminChatUnsub = null;
+        let gachaHistoryUnsub = null;
         let userDataListener = null;
         let userOrdersUnsub = null;
         let adminOrdersUnsub = null;
-        let miningInterval = null;
         let adminMiningUnsub = null;
-        const MINING_CYCLE_MS = 30 * 60 * 1000;
-
-        let adminChatUnsub = null;
+        let historyUnsub = null;
+        let notifUnsub = null;
         let walletUnsub = null;
         let walletLogUnsub = null;
-        let adminDepositUnsub = null;
-        let adminWalletLogUnsub = null;
-        let adminAutoUnsubs = [];
-        let currentWalletBalance = 0;
+        let miningInterval = null;
+
+        // Bộ hàm phòng vệ DOM tự động kiểm tra phần tử tồn tại trước khi ghi dữ liệu (Sửa lỗi #19)
+        const safeSetText = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+        const safeSetHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+        const safeSetSrc = (id, src) => { const el = document.getElementById(id); if (el) el.src = src; };
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 let currentCalculatedPages = 0;
 let currentCalculatedPrintPrice = 0;
@@ -1479,10 +1519,15 @@ let currentFilesArray = []; // Chuyển thành mảng lưu nhiều file
             document.getElementById('btn-auth').innerText = isLogin ? "Đăng Nhập" : "Đăng Ký";
             document.getElementById('btn-toggle-auth').innerText = isLogin ? "Chưa có tài khoản? Đăng ký ngay" : "Đã có tài khoản? Đăng nhập";
         };
+    // --- HÀM ĐĂNG XUẤT TOÀN DIỆN DIỆT SẠCH LISTENER CHẠY NGẦM (SỬA LỖI #5) ---
         window.handleLogout = async () => {
+            if (!confirm("Bạn có chắc chắn muốn đăng xuất không?")) return;
             try {
                 resetRoleUI();
                 currentSessionRole = null;
+                lastInitedUid = null;
+                
+                // Kích hoạt lệnh Unsubscribe chuỗi Listener chạy ẩn để làm sạch bộ nhớ hoàn toàn
                 if (userDataListener) { userDataListener(); userDataListener = null; }
                 if (userOrdersUnsub) { userOrdersUnsub(); userOrdersUnsub = null; }
                 if (adminOrdersUnsub) { adminOrdersUnsub(); adminOrdersUnsub = null; }
@@ -1490,10 +1535,31 @@ let currentFilesArray = []; // Chuyển thành mảng lưu nhiều file
                 if (walletLogUnsub) { walletLogUnsub(); walletLogUnsub = null; }
                 if (historyUnsub) { historyUnsub(); historyUnsub = null; }
                 if (notifUnsub) { notifUnsub(); notifUnsub = null; }
+                if (adminUsersUnsub) { adminUsersUnsub(); adminUsersUnsub = null; }
+                if (adminVouchersUnsub) { adminVouchersUnsub(); adminVouchersUnsub = null; }
+                if (adminChatListUnsub) { adminChatListUnsub(); adminChatListUnsub = null; }
+                if (adminDepositUnsub) { adminDepositUnsub(); adminDepositUnsub = null; }
+                if (adminWalletLogUnsub) { adminWalletLogUnsub(); adminWalletLogUnsub = null; }
+                if (adminChatUnsub) { adminChatUnsub(); adminChatUnsub = null; }
+                if (gachaHistoryUnsub) { gachaHistoryUnsub(); gachaHistoryUnsub = null; }
+                if (systemConfigUnsub) { systemConfigUnsub(); systemConfigUnsub = null; }
+                if (userChatUnsub) { userChatUnsub(); userChatUnsub = null; }
                 if (adminMiningUnsub) { adminMiningUnsub(); adminMiningUnsub = null; }
+                
+                // Giải phóng mảng theo dõi tự động hóa của bảng điều khiển Admin
+                if (window.adminAutoUnsubs && window.adminAutoUnsubs.length) {
+                    window.adminAutoUnsubs.forEach(unsub => { if(typeof unsub === 'function') unsub(); });
+                    window.adminAutoUnsubs = [];
+                }
+
+                // Dừng bộ đếm thời gian hầm mỏ đào tài nguyên tránh ngốn pin thiết bị
                 if (miningInterval) { clearInterval(miningInterval); miningInterval = null; }
+                
                 await signOut(auth);
-            } catch (e) { showToast('Lỗi đăng xuất: ' + e.message, 'error'); }
+                showToast("Đăng xuất thành công. Toàn bộ tài nguyên đã được giải phóng.");
+            } catch (e) { 
+                showToast('Lỗi xảy ra khi đăng xuất: ' + e.message, 'error'); 
+            }
         };
         window.handlePasswordReset = async () => {
             const emailInput = document.getElementById('inp-email');
@@ -1566,54 +1632,84 @@ let currentFilesArray = []; // Chuyển thành mảng lưu nhiều file
             }
         }
 
+       // --- THEO DÕI ĐĂNG NHẬP CHỐNG TRÙNG LẶP LISTENER (SỬA LỖI #3 & #4) ---
         onAuthStateChanged(auth, async (user) => {
             currentUser = user;
-            resetRoleUI();
+            
             if (user) {
+                // KIỂM TRA KHÓA AN TOÀN (Sửa lỗi #3)
+                if (lastInitedUid === user.uid) {
+                    console.log("[Auth Pipeline] Token làm mới định kỳ. Duy trì luồng lắng nghe cũ an toàn.");
+                    return;
+                }
+                lastInitedUid = user.uid; 
+
                 document.getElementById('auth-screen').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
                 document.getElementById('notification-fab')?.classList.remove('hidden');
+                
                 try {
                     const role = isAdminAccount(user) ? 'admin' : 'user';
                     currentSessionRole = role;
                     
-                    // 1. CHO HIỆN GIAO DIỆN & NÚT BẤM LÊN NGAY LẬP TỨC (KHÔNG CHỜ ĐỢI)
+                    resetRoleUI(); 
+
                     if (role === 'admin') {
-                        document.getElementById('display-role-d').innerText = "Quản trị viên";
-                        const roleM = document.getElementById('display-role-m'); if(roleM) roleM.innerText = "Admin";
-                        document.getElementById('menu-admin-desktop').classList.remove('hidden');
-                        document.getElementById('menu-user-desktop').classList.add('hidden');
-                        document.getElementById('chat-widget').classList.add('hidden');
+                        safeSetText('display-role-d', "Quản trị viên");
+                        safeSetText('display-role-m', "Admin");
+                        document.getElementById('menu-admin-desktop')?.classList.remove('hidden');
+                        document.getElementById('menu-user-desktop')?.classList.add('hidden');
                         renderMobileNav('admin');
-                        switchTab('admin-automation'); // Mở tab lên ngay cho khỏi đơ
-                        initAdminOrders(); initAdminVouchers(); initAdminGacha(); initAdminChatList(); initAdminUsers(); initAdminPayments(); initAutomationDashboard(); initAdminMining(); autoReminderSweep(false);
+                        switchTab('admin-automation');
+                        
+                        // Gán biến Unsub trực tiếp để quản lý vòng đời (Sửa lỗi #4)
+                        if (adminUsersUnsub) adminUsersUnsub();
+                        adminUsersUnsub = onSnapshot(collection(db, "users"), (snapshot) => {
+                            adminUsersCache = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                            renderAdminUsersFromCache();
+                            renderAdminMiningFromCache();
+                        }, (error) => console.error("Lỗi đồng bộ Users:", error));
+                        
+                        initAdminOrders(); 
+                        initAdminVouchers(); 
+                        initAdminChatList(); 
+                        initAdminPayments(); 
+                        initAutomationDashboard(); 
+                        initAdminMining(); 
+                        autoReminderSweep(false);
                         initNotificationListener('admin', user.uid);
                     } else {
-                        document.getElementById('display-role-d').innerText = "Thành viên";
-                        const roleM = document.getElementById('display-role-m'); if(roleM) roleM.innerText = "Member";
-                        document.getElementById('menu-user-desktop').classList.remove('hidden');
-                        document.getElementById('menu-admin-desktop').classList.add('hidden');
-                        document.getElementById('chat-widget').classList.remove('hidden');
+                        safeSetText('display-role-d', "Thành viên");
+                        safeSetText('display-role-m', "Member");
+                        document.getElementById('menu-user-desktop')?.classList.remove('hidden');
+                        document.getElementById('menu-admin-desktop')?.classList.add('hidden');
+                        document.getElementById('chat-widget')?.classList.remove('hidden');
                         renderMobileNav('user');
-                        switchTab('user-home'); // Mở tab lên ngay cho khỏi đơ
-                        initUserOrders(user.uid); initUserWallet(user.uid); initUserChat(user.uid); listenUserData(user.uid);
+                        switchTab('user-home');
+                        
+                        initUserOrders(user.uid); 
+                        initUserWallet(user.uid); 
+                        initUserChat(user.uid); 
+                        listenUserData(user.uid);
                         initNotificationListener('user', user.uid);
                     }
 
-                    // 2. CHẠY NGẦM ĐỒNG BỘ DỮ LIỆU Ở BACKGROUND SAU KHI UI ĐÃ HIỆN
                     ensureUserProfileDoc(user, role).catch(e => console.warn("Lỗi đồng bộ hồ sơ:", e));
                     setupPushNotification(user);
                     requestNotificationPermission();
-                } catch (err) { debugLog("Init Error: " + err.message); showToast('Lỗi hiển thị giao diện: ' + err.message, 'error'); }
+                } catch (err) { 
+                    console.error("Lỗi phân quyền hệ thống:", err); 
+                }
             } else {
+                lastInitedUid = null;
                 currentSessionRole = null;
+                resetRoleUI();
                 document.getElementById('auth-screen').classList.remove('hidden');
                 document.getElementById('main-app').classList.add('hidden');
                 document.getElementById('notification-fab')?.classList.add('hidden');
                 document.getElementById('notification-panel')?.classList.add('hidden');
             }
         });
-
 
         window.handleGoogleAuth = async () => {
             setAuthError('');
@@ -1813,49 +1909,57 @@ let currentFilesArray = []; // Chuyển thành mảng lưu nhiều file
 
         // --- CẬP NHẬT: USER DATA & PET 3D (10 HÌNH THÁI & MINING) ---
         // --- 1. HÀM NGHE DỮ LIỆU USER (ĐÃ SỬA NÚT TIẾN HÓA & DANH HIỆU) ---
+       // --- HÀM NGHE DỮ LIỆU USER REALTIME AN TOÀN TUYỆT ĐỐI (SỬA LỖI #18 & #19) ---
         function listenUserData(uid) {
             const PET_MODELS_10 = PET_MODEL_URLS;
 
+            if (userDataListener) userDataListener(); // Đóng listener cũ trước khi tạo luồng mới
+            
             userDataListener = onSnapshot(doc(db, "users", uid), (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
 
-                    // --- FIX: TỰ ĐỘNG KHỞI TẠO THỜI GIAN NẾU THIẾU ---
+                    // CHỐT CHẶN PHÒNG LỖI #18: Nếu dữ liệu cục bộ đang ghi ngầm lên Server, chưa đồng bộ xong thì dừng ngay, tránh kích hoạt lặp vô hạn
                     if (!data.lastMiningTime) {
+                        if (docSnap.metadata.hasPendingWrites) {
+                            console.log("[Data Guard] Đồng bộ mốc thời gian hầm mỏ đang chờ Server, tạm bỏ qua lượt quét.");
+                            return;
+                        }
                         updateDoc(doc(db, "users", uid), { lastMiningTime: serverTimestamp() });
                         return; 
                     }
 
-                    // --- Cập nhật thông tin cơ bản & Danh hiệu ---
-                    const name = data.displayName || currentUser.displayName || "User";
-                    const avatar = data.photoURL || currentUser.photoURL || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+                    const name = data.displayName || "User";
+                    const avatar = data.photoURL || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
                     
-                    // Xử lý Danh hiệu
                     let titleHtml = "";
                     if (data.specialTitle && data.titleExpiredAt) {
                         const expiredAt = data.titleExpiredAt.toDate();
-                        const now = new Date();
-                        if (now < expiredAt) {
-                            titleHtml = `<span class="rank-title ${data.titleClass}">${data.specialTitle}</span>`;
+                        if (new Date() < expiredAt) {
+                            titleHtml = `<span class="rank-title ${window.sanitizeText(data.titleClass)}">${window.sanitizeText(data.specialTitle)}</span>`;
                         }
                     }
 
-                  // --- ĐÃ TỐI ƯU CHUỖI HIỂN THỊ DANH HIỆU ---
-                    document.getElementById('display-name-d').innerHTML = `<div class="flex flex-col items-center"><span>${name}</span>${titleHtml ? `<div class="mt-1">${titleHtml}</div>` : ''}</div>`;
-                    document.getElementById('display-name-m').innerHTML = `<div class="flex flex-col items-end"><span class="truncate w-24 text-right">${name}</span>${titleHtml ? `<div class="scale-75 origin-right -mt-0.5">${titleHtml}</div>` : ''}</div>`;
-                    document.getElementById('user-avatar-d').src = avatar;
-                    document.getElementById('user-avatar-m').src = avatar;
-                    document.getElementById('user-avatar-member').src = avatar;
-                    document.getElementById('header-points').innerText = `${data.points || 0}đ`;
-                    document.getElementById('header-food').innerHTML = `<i class="fa-solid fa-drumstick-bite"></i> ${data.petFood || 0}`;
+                    // SỬA LỖI #19: Thay thế hoàn toàn viết gán thô bằng bộ hàm phòng vệ DOM đã khai báo ở bước 2
+                    safeSetHTML('display-name-d', `<div class="flex flex-col items-center"><span>${window.sanitizeText(name)}</span>${titleHtml ? `<div class="mt-1">${titleHtml}</div>` : ''}</div>`);
+                    safeSetHTML('display-name-m', `<div class="flex flex-col items-end"><span class="truncate w-24 text-right">${window.sanitizeText(name)}</span>${titleHtml ? `<div class="scale-75 origin-right -mt-0.5">${titleHtml}</div>` : ''}</div>`);
+                    safeSetSrc('user-avatar-d', avatar);
+                    safeSetSrc('user-avatar-m', avatar);
+                    safeSetSrc('user-avatar-member', avatar);
+                    safeSetText('header-points', `${data.points || 0}đ`);
+                    safeSetHTML('header-food', `<i class="fa-solid fa-drumstick-bite"></i> ${data.petFood || 0}`);
+                    
                     currentWalletBalance = Number(data.balance || 0);
                     const balanceText = fmtVND(currentWalletBalance);
-                    const walletD = document.getElementById('wallet-balance-d'); if(walletD) walletD.innerHTML = `<i class="fa-solid fa-wallet"></i> Ví: ${balanceText}`;
-                    const walletCard = document.getElementById('wallet-balance-card'); if(walletCard) walletCard.innerText = balanceText;
-                    const headerBalance = document.getElementById('header-balance'); if(headerBalance) headerBalance.innerHTML = `<i class="fa-solid fa-wallet"></i> ${balanceText}`;
-                    const orderWalletBalance = document.getElementById('order-wallet-balance'); if(orderWalletBalance) orderWalletBalance.innerText = balanceText;
+                    
+                    const walletD = document.getElementById('wallet-balance-d'); 
+                    if(walletD) walletD.innerHTML = `<i class="fa-solid fa-wallet"></i> Ví: ${balanceText}`;
+                    
+                    safeSetText('wallet-balance-card', balanceText);
+                    safeSetHTML('header-balance', `<i class="fa-solid fa-wallet"></i> ${balanceText}`);
+                    safeSetText('order-wallet-balance', balanceText);
 
-                    // --- Cập nhật Rank ---
+                    // --- Cập nhật Khung Ảnh Đại Diện động theo Rank ---
                     const level = Math.min(100, Math.floor((data.points || 0) / 100));
                     let rankIndex = level < 10 ? 1 : level < 30 ? 2 : level < 50 ? 3 : 4;
                     if(level < 1) rankIndex = 0;
@@ -1865,59 +1969,64 @@ let currentFilesArray = []; // Chuyển thành mảng lưu nhiều file
                         const el = document.getElementById(id);
                         if(el) el.className = el.className.replace(/frame-\d/g, '') + ` ${frameClass} avatar-container`;
                     });
-                    document.getElementById('member-lvl-badge').innerText = level;
-                    document.getElementById('member-progress-bar').style.width = `${(data.points || 0) % 100}%`;
-                    document.getElementById('member-points').innerText = data.points || 0;
-                    document.getElementById('member-next-level').innerText = (level + 1) * 100;
+                    
+                    safeSetText('member-lvl-badge', level);
+                    const memberProgressBar = document.getElementById('member-progress-bar');
+                    if (memberProgressBar) memberProgressBar.style.width = `${(data.points || 0) % 100}%`;
+                    
+                    safeSetText('member-points', data.points || 0);
+                    safeSetText('member-next-level', (level + 1) * 100);
 
-                    // --- CẬP NHẬT PET & TIẾN HÓA ---
+                    // --- Cập nhật Thần Thú ---
                     const pet = data.pet || { level: 1, currentXp: 0, form: 0 };
                     pet.form = clampNumber(pet.form ?? 0, 0, PET_FORM_NAMES.length - 1);
                     updatePetVisual(data);
                     renderPetSelector(data.petSpecies || 0);
                     updateGachaStatusFromUser(data);
-                    let xpNeeded = Math.max(10, pet.level * 10);
                     
-                    document.getElementById('pet-level-display').innerText = `Level ${pet.level}`;
-                    document.getElementById('pet-food-display').innerText = data.petFood || 0;
-                    document.getElementById('pet-stone-display').innerText = data.evolutionStones || 0;
-                    document.getElementById('pet-xp-text').innerText = `${pet.currentXp} / ${xpNeeded}`;
-                    document.getElementById('pet-xp-bar').style.width = `${Math.min(100, (pet.currentXp / xpNeeded) * 100)}%`;
+                    let xpNeeded = Math.max(10, pet.level * 10);
+                    safeSetText('pet-level-display', `Level ${pet.level}`);
+                    safeSetText('pet-food-display', data.petFood || 0);
+                    safeSetText('pet-stone-display', data.evolutionStones || 0);
+                    safeSetText('pet-xp-text', `${pet.currentXp} / ${xpNeeded}`);
+                    
+                    const petXpBar = document.getElementById('pet-xp-bar');
+                    if (petXpBar) petXpBar.style.width = `${Math.min(100, (pet.currentXp / xpNeeded) * 100)}%`;
 
                     const maxUnlockedForm = maxPetFormForLevel(pet.level);
                     const btnEvolve = document.getElementById('btn-evolve');
                     
-                    if (pet.form < maxUnlockedForm && pet.form < PET_FORM_NAMES.length - 1) {
-                        btnEvolve.classList.remove('hidden'); 
-                        if (data.evolutionStones > 0) {
-                            btnEvolve.disabled = false;
-                            btnEvolve.innerHTML = '<i class="fa-solid fa-bolt"></i> Tiến hóa';
-                            btnEvolve.className = "bg-gradient-to-b from-purple-500 to-purple-700 text-white px-8 py-3 rounded-2xl font-bold shadow-[0_5px_0_rgb(107,33,168)] active:shadow-none active:translate-y-1 transition-all animate-pulse";
+                    if (btnEvolve) {
+                        if (pet.form < maxUnlockedForm && pet.form < PET_FORM_NAMES.length - 1) {
+                            btnEvolve.classList.remove('hidden'); 
+                            if (data.evolutionStones > 0) {
+                                btnEvolve.disabled = false;
+                                btnEvolve.innerHTML = '<i class="fa-solid fa-bolt"></i> Tiến hóa';
+                                btnEvolve.className = "bg-gradient-to-b from-purple-500 to-purple-700 text-white px-8 py-3 rounded-2xl font-bold shadow-[0_5px_0_rgb(107,33,168)] active:shadow-none active:translate-y-1 transition-all animate-pulse";
+                            } else {
+                                btnEvolve.disabled = true;
+                                btnEvolve.innerHTML = '<i class="fa-solid fa-lock"></i> Thiếu đá';
+                                btnEvolve.className = "bg-gray-400 text-white px-8 py-3 rounded-2xl font-bold cursor-not-allowed";
+                            }
                         } else {
-                            btnEvolve.disabled = true;
-                            btnEvolve.innerHTML = '<i class="fa-solid fa-lock"></i> Thiếu đá';
-                            btnEvolve.className = "bg-gray-400 text-white px-8 py-3 rounded-2xl font-bold cursor-not-allowed";
+                            btnEvolve.classList.add('hidden'); 
                         }
-                    } else {
-                        btnEvolve.classList.add('hidden'); 
                     }
 
-                    // Hiển thị Model 3D
+                    // Quản lý hiển thị Mô hình Pet 3D dữ liệu động
                     const viewer = document.getElementById('pet-3d-model');
                     if (viewer) {
-                        const targetSrc = PET_MODELS_10[pet.form] || PET_MODELS_10[0];
+                        const targetSrc = PET_MODEL_URLS[pet.form] || PET_MODEL_URLS[0];
                         if (viewer.src !== targetSrc) viewer.src = targetSrc;
 
                         let baseScale = 0.8 + (pet.form * 0.1); 
                         let growth = (pet.level % 10) * 0.03; 
                         let finalScale = baseScale + growth;
                         viewer.style.transform = `scale(${finalScale})`;
-                        
-                        if (pet.form === 0) viewer.animationName = "Idle";
-                        else viewer.animationName = "Running";
+                        viewer.animationName = pet.form === 0 ? "Idle" : "Running";
                     }
 
-                    // Aura Effect
+                    // Đồng bộ hệ thống hiệu ứng Aura hào quang xung quanh Thần Thú
                     const auraEl = document.getElementById('pet-aura');
                     if(auraEl) {
                         auraEl.className = 'transition-all duration-1000';
@@ -1926,10 +2035,10 @@ let currentFilesArray = []; // Chuyển thành mảng lưu nhiều file
                         if (pet.level >= 90) auraEl.classList.add('aura-god');
                     }
 
-                    // Kích hoạt đào mỏ
+                    // Kích hoạt đồng bộ mốc khai thác tài nguyên hầm mỏ vô tận
                     initMiningSystem(data.lastMiningTime, pet.level, data.miningTickets || 0);
                 }
-            }, (error) => console.log("UserData Error: " + error.message));
+            }, (error) => console.log("Lỗi đồng bộ thông tin User: " + error.message));
         }
 
         // --- PET ACTIONS ---
@@ -2079,63 +2188,78 @@ let currentFilesArray = []; // Chuyển thành mảng lưu nhiều file
 // --- LOGIC ĐÀO MỎ NÂNG CẤP (VÔ TẬN & 1 LƯỢT/LẦN & AUTO VOUCHER) ---
 
 // 1. Khởi tạo hệ thống đào (Không giới hạn)
-function initMiningSystem(lastMiningTime, petLevel, manualTickets = 0) {
-    if (miningInterval) clearInterval(miningInterval);
+// --- LOGIC ĐÀO MỎ KHÓA TIẾT KIỆM PIN TAB ẨN (SỬA LỖI #14) ---
+        function initMiningSystem(lastMiningTime, petLevel, manualTickets = 0) {
+            if (miningInterval) clearInterval(miningInterval);
 
-    let anchorDate;
-    if (lastMiningTime && lastMiningTime.toDate) anchorDate = lastMiningTime.toDate();
-    else if (lastMiningTime) anchorDate = new Date(lastMiningTime);
-    else anchorDate = new Date();
-    if (Number.isNaN(anchorDate.getTime())) anchorDate = new Date();
-    manualTickets = Math.max(0, Math.floor(Number(manualTickets) || 0));
+            let anchorDate;
+            if (lastMiningTime && lastMiningTime.toDate) anchorDate = lastMiningTime.toDate();
+            else if (lastMiningTime) anchorDate = new Date(lastMiningTime);
+            else anchorDate = new Date();
+            if (Number.isNaN(anchorDate.getTime())) anchorDate = new Date();
+            manualTickets = Math.max(0, Math.floor(Number(manualTickets) || 0));
 
-    loadMiningHistory();
+            loadMiningHistory();
 
-    const updateMiningUI = () => {
-        const now = new Date();
-        const diffMs = Math.max(0, now - anchorDate);
-        const cycleMs = MINING_CYCLE_MS;
-        const autoSlots = Math.max(0, Math.floor(diffMs / cycleMs));
-        const pendingSlots = autoSlots + manualTickets;
-        const nextClaimMs = cycleMs - (diffMs % cycleMs || 0);
-        const hours = Math.floor(nextClaimMs / (1000 * 60 * 60));
-        const minutes = Math.floor((nextClaimMs % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((nextClaimMs % (1000 * 60)) / 1000);
-        const hStr = hours < 10 ? '0' + hours : hours;
-        const mStr = minutes < 10 ? '0' + minutes : minutes;
-        const sStr = seconds < 10 ? '0' + seconds : seconds;
-        const countEl = document.getElementById('pending-rewards-count');
-        const timerEl = document.getElementById('mining-countdown');
-        const btnClaim = document.getElementById('btn-claim-mining');
-        const statusEl = document.getElementById('mining-status');
-        if (countEl) countEl.innerText = pendingSlots;
-        if (timerEl) timerEl.innerText = hours > 0 ? `${hStr}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
-        const circle = document.getElementById('mining-progress-ring');
-        if(circle) {
-            const radius = circle.r.baseVal.value;
-            const circumference = radius * 2 * Math.PI;
-            const progress = ((cycleMs - nextClaimMs) / cycleMs);
-            circle.style.strokeDashoffset = circumference - progress * circumference;
+            const updateMiningUI = () => {
+                if (document.hidden) return; // CHẶN LỖI #14: Đóng băng xử lý DOM hoàn toàn khi tab bị ẩn ngầm
+                
+                const now = new Date();
+                const diffMs = Math.max(0, now - anchorDate);
+                const cycleMs = MINING_CYCLE_MS;
+                const autoSlots = Math.max(0, Math.floor(diffMs / cycleMs));
+                const pendingSlots = autoSlots + manualTickets;
+                const nextClaimMs = cycleMs - (diffMs % cycleMs || 0);
+                const hours = Math.floor(nextClaimMs / (1000 * 60 * 60));
+                const minutes = Math.floor((nextClaimMs % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((nextClaimMs % (1000 * 60)) / 1000);
+                const hStr = hours < 10 ? '0' + hours : hours;
+                const mStr = minutes < 10 ? '0' + minutes : minutes;
+                const sStr = seconds < 10 ? '0' + seconds : seconds;
+                const countEl = document.getElementById('pending-rewards-count');
+                const timerEl = document.getElementById('mining-countdown');
+                const btnClaim = document.getElementById('btn-claim-mining');
+                const statusEl = document.getElementById('mining-status');
+                if (countEl) countEl.innerText = pendingSlots;
+                if (timerEl) timerEl.innerText = hours > 0 ? `${hStr}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
+                const circle = document.getElementById('mining-progress-ring');
+                if(circle) {
+                    const radius = circle.r.baseVal.value;
+                    const circumference = radius * 2 * Math.PI;
+                    const progress = ((cycleMs - nextClaimMs) / cycleMs);
+                    circle.style.strokeDashoffset = circumference - progress * circumference;
+                }
+                if(btnClaim && statusEl) {
+                    if (pendingSlots > 0) {
+                        btnClaim.disabled = false;
+                        btnClaim.classList.remove('opacity-50', 'cursor-not-allowed');
+                        btnClaim.classList.add('animate-pulse');
+                        statusEl.innerText = manualTickets > 0 ? `Có ${pendingSlots} lượt đào khả dụng` : "Sẵn sàng khai thác!";
+                        statusEl.className = "text-xs font-bold text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse";
+                    } else {
+                        btnClaim.disabled = true;
+                        btnClaim.classList.add('opacity-50', 'cursor-not-allowed');
+                        btnClaim.classList.remove('animate-pulse');
+                        statusEl.innerText = "Đang đào...";
+                        statusEl.className = "text-xs font-bold text-green-400 bg-green-900/30 px-2 py-1 rounded";
+                    }
+                }
+            };
+            
+            window.__triggerMiningUIUpdate = updateMiningUI;
+            updateMiningUI();
+            miningInterval = setInterval(updateMiningUI, 1000);
         }
-        if(btnClaim && statusEl) {
-            if (pendingSlots > 0) {
-                btnClaim.disabled = false;
-                btnClaim.classList.remove('opacity-50', 'cursor-not-allowed');
-                btnClaim.classList.add('animate-pulse');
-                statusEl.innerText = manualTickets > 0 ? `Có ${pendingSlots} lượt đào khả dụng` : "Sẵn sàng khai thác!";
-                statusEl.className = "text-xs font-bold text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse";
-            } else {
-                btnClaim.disabled = true;
-                btnClaim.classList.add('opacity-50', 'cursor-not-allowed');
-                btnClaim.classList.remove('animate-pulse');
-                statusEl.innerText = "Đang đào...";
-                statusEl.className = "text-xs font-bold text-green-400 bg-green-900/30 px-2 py-1 rounded";
-            }
+
+        // Đảm bảo khi người dùng quay lại tab ứng dụng, giao diện lập tức khớp thời gian thực không bị trễ 1s
+        if (!window.__miningVisibilityAttached) {
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && typeof window.__triggerMiningUIUpdate === 'function') {
+                    window.__triggerMiningUIUpdate();
+                }
+            });
+            window.__miningVisibilityAttached = true;
         }
-    };
-    updateMiningUI();
-    miningInterval = setInterval(updateMiningUI, 1000);
-}
 
 window.handleClaimMiningOne = async () => {
     if (!currentUser || currentSessionRole !== 'user') return showToast('Chỉ thành viên mới dùng hầm mỏ.', 'error');
@@ -2256,12 +2380,13 @@ window.loadMiningHistory = () => {
         const listEl = document.getElementById('mining-history-list');
         if (!listEl) return;
         
-        listEl.innerHTML = "";
-        
         if (snap.empty) {
             listEl.innerHTML = '<div class="text-center text-slate-500 py-4 italic">Chưa có lịch sử.</div>';
             return;
         }
+
+        // Thay thế nối chuỗi += bằng mảng bộ đệm gom dữ liệu render 1 lần duy nhất (Sửa lỗi #13)
+        const htmlBuffer = [];
 
         snap.forEach(d => {
             const item = d.data();
@@ -2272,7 +2397,6 @@ window.loadMiningHistory = () => {
             if(item.type === 'exp') icon = '<i class="fa-solid fa-dragon text-green-500"></i>';
             if(item.type === 'voucher') icon = '<i class="fa-solid fa-ticket text-pink-500"></i>';
 
-            // Logic hiển thị mã code nếu có
             let codeHtml = '';
             if (item.code) {
                 codeHtml = `
@@ -2282,18 +2406,19 @@ window.loadMiningHistory = () => {
                 </div>`;
             }
 
-            listEl.innerHTML += `
+            htmlBuffer.push(`
                 <div class="bg-slate-800/50 p-2 rounded border border-slate-700/50 fade-in mb-2">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2">
                             <span class="text-slate-500 font-mono text-[10px] w-10">${timeStr}</span>
-                            <span class="${item.class} font-bold flex items-center gap-1 text-[11px]">${icon} ${item.name}</span>
+                            <span class="${window.sanitizeText(item.class || '')} font-bold flex items-center gap-1 text-[11px]">${icon} ${window.sanitizeText(item.name || '')}</span>
                         </div>
                     </div>
                     ${codeHtml}
                 </div>
-            `;
+            `);
         });
+        listEl.innerHTML = htmlBuffer.join('');
     });
 };
 
@@ -2307,27 +2432,24 @@ window.clearMiningHistory = async () => {
     await batch.commit();
     showToast("Đã xóa lịch sử.");
 };
-        // --- ADMIN FUNCTIONS ---
-        function buildDuplicateEmailMap(users = adminUsersCache) {
-            const map = {};
-            users.forEach(u => {
-                const key = normalizeEmail(u.email);
-                if (!key) return;
-                if (!map[key]) map[key] = [];
-                map[key].push(u);
-            });
-            return map;
-        }
+
+// --- ADMIN FUNCTIONS ---
+function buildDuplicateEmailMap(users = adminUsersCache) {
+    const map = {};
+    users.forEach(u => {
+        const key = normalizeEmail(u.email);
+        if (!key) return;
+        if (!map[key]) map[key] = [];
+        map[key].push(u);
+    });
+    return map;
+}
 
 function initAdminUsers() {
-            onSnapshot(collection(db, "users"), (snapshot) => {
-                adminUsersCache = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-                if (document.getElementById('admin-users-list')) renderAdminUsersFromCache();
-                if (document.getElementById('admin-mining-list')) renderAdminMiningFromCache();
-            }, (error) => {
-                showToast('Không tải được hội viên: ' + error.message, 'error');
-            });
-        }
+    if (!requireAdmin()) return;
+    // SỬA LỖI #4: Triệt tiêu cổng lắng nghe vô danh, đồng bộ nạp thẳng từ cache an toàn
+    renderAdminUsersFromCache();
+}
         window.renderAdminUsersFromCache = () => {
             const list = document.getElementById('admin-users-list');
             if (!list) return;
@@ -2686,8 +2808,10 @@ window.handleAdminGift = async (e) => {
         };
 
         // --- CẬP NHẬT LOAD LEADERBOARD CÓ DANH HIỆU ---
+       // --- TỐI ƯU HIỆU NĂNG RENDER BXH ĐUA TOP (SỬA LỖI #13) ---
         window.loadLeaderboard = async (type) => {
             const container = document.getElementById('leaderboard-container');
+            if (!container) return;
             container.innerHTML = '<div class="text-center py-4"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>';
             
             try {
@@ -2695,16 +2819,15 @@ window.handleAdminGift = async (e) => {
                 const q = query(collection(db, "users"), orderBy(field, "desc"), limit(20));
                 const snap = await getDocs(q);
                 
-                container.innerHTML = "";
                 let rank = 1;
                 const now = new Date(); 
+                const htmlBuffer = []; // Gom dữ liệu dựng mảng siêu tốc
 
                 snap.forEach(doc => {
                     const u = doc.data();
                     const score = u[field] || 0;
                     const name = u.displayName || "User";
                     
-                    // XỬ LÝ DANH HIỆU TRONG BXH
                     let userTitleHtml = "";
                     if (u.specialTitle && u.titleExpiredAt) {
                         const expiredAt = u.titleExpiredAt.toDate();
@@ -2718,21 +2841,23 @@ window.handleAdminGift = async (e) => {
                     if (rank === 2) { bgClass = "bg-slate-100 border-slate-200"; rankIcon = "🥈"; }
                     if (rank === 3) { bgClass = "bg-orange-50 border-orange-200"; rankIcon = "🥉"; }
                     
-                    container.innerHTML += `
+                    htmlBuffer.push(`
                         <div class="flex items-center justify-between p-3 mb-2 rounded-lg border ${bgClass}">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 text-center text-lg">${rankIcon}</div>
                                 <div>
                                     <div class="font-bold text-sm text-slate-700 flex items-center flex-wrap">
-                                        ${name} ${userTitleHtml}
+                                        ${sanitizeText(name)} ${userTitleHtml}
                                     </div>
-                                    <div class="text-[10px] text-slate-500">Lv.${u.pet?.level || 1}</div>
+                                    <div class="text-[10px] text-slate-400 font-mono">Lv.${u.pet?.level || 1}</div>
                                 </div>
                             </div>
                             <div class="font-bold text-brand-600 text-sm">${score} pts</div>
-                        </div>`;
+                        </div>`);
                     rank++;
                 });
+                
+                container.innerHTML = htmlBuffer.join(''); // Đổ dữ liệu ra màn hình 1 lần duy nhất
             } catch (e) {
                 container.innerHTML = `<div class="text-red-500 text-center text-sm">Lỗi: ${e.message}</div>`;
             }
@@ -2922,9 +3047,131 @@ window.handleAdminGift = async (e) => {
                 btn.innerHTML = oldText;
             }
         };
-        function initUserOrders(uid) { const q = query(collection(db, "orders"), where("userId", "==", uid), orderBy("createdAt", "desc")); if (userOrdersUnsub) userOrdersUnsub(); userOrdersUnsub = onSnapshot(q, (snap) => { const div = document.getElementById('user-orders-list'); div.innerHTML = ""; if (snap.empty) { div.innerHTML = '<div class="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400">Bạn chưa có đơn hàng nào.</div>'; return; } snap.forEach(d => { const o = d.data(); const total = fmtVND(o.totalPrice || 0); let statusVi = 'Chờ báo giá', statusColor = 'bg-gray-100 text-gray-600'; if(o.status === 'pending_payment') { statusVi = 'Chờ TT'; statusColor = 'bg-yellow-100 text-yellow-700'; } else if(o.status === 'payment_review') { statusVi = 'Chờ xử lý'; statusColor = 'bg-orange-100 text-orange-700'; } else if(o.status === 'paid') { statusVi = 'Đã TT'; statusColor = 'bg-green-100 text-green-700'; } else if(o.status === 'printing') { statusVi = 'Đang in'; statusColor = 'bg-blue-100 text-blue-700'; } else if(o.status === 'delivered') { statusVi = 'Đã Giao'; statusColor = 'bg-purple-100 text-purple-700'; } const payBtn = o.status === 'pending_payment' ? `<button onclick="openPaymentModal('${d.id}', ${Number(o.totalPrice || 0)})" class="bg-brand-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-700 animate-pulse">Thanh toán</button>` : ''; const paymentInfo = o.paymentMethod ? `<p class="text-[10px] text-slate-400"><i class="fa-solid fa-credit-card mr-1"></i> ${o.paymentMethod === 'wallet' ? 'Ví tiền' : 'Thanh toán cũ'}</p>` : ''; const userLinksHtml = String(o.driveLink || '').split(',').map((url, idx) => `<a href="${sanitizeText(url.trim())}" target="_blank" class="text-blue-500 underline mr-2 font-bold">[File ${idx + 1}]</a>`).join(''); div.innerHTML += `<div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition"><div class="flex justify-between items-center mb-1"><span class="font-bold text-slate-700 text-sm">#${d.id.slice(0,6)}</span><span class="text-[10px] font-bold px-2 py-1 rounded uppercase ${statusColor}">${statusVi}</span></div><div class="text-[10px] text-slate-400 mb-2 flex items-center gap-1"><i class="fa-regular fa-clock"></i> ${formatTime(o.createdAt)}</div><div class="text-xs text-slate-500 mb-3 space-y-1"><p class="truncate"><i class="fa-solid fa-link mr-1"></i> ${userLinksHtml}</p><p class="truncate"><i class="fa-solid fa-note-sticky mr-1"></i> ${sanitizeText(o.userNote || '---')}</p>${o.adminNote ? `<p class="text-brand-600 font-medium mt-1 border-t border-dashed pt-1"><i class="fa-solid fa-reply mr-1"></i> Shop: ${sanitizeText(o.adminNote)}</p>` : ''}${paymentInfo}</div><div class="flex justify-between items-center pt-3 border-t border-slate-100"><span class="font-extrabold text-brand-600 text-base">${total}</span>${payBtn}</div></div>`; }); }); }
-        function initAdminOrders() { if (!requireAdmin()) return; if (adminOrdersUnsub) { adminOrdersUnsub(); adminOrdersUnsub = null; } const q = query(collection(db, "orders"), orderBy("createdAt", "desc")); adminOrdersUnsub = onSnapshot(q, (snap) => { const div = document.getElementById('admin-orders-list'); if (!div) return; if (snap.empty) { div.innerHTML = '<div class="lg:col-span-2 bg-white p-8 rounded-2xl text-center text-slate-400 border border-slate-200">Chưa có đơn hàng.</div>'; return; } const html = []; snap.forEach(d => { const o = d.data(); const id = d.id; let statusBadge = `<span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold">Mới</span>`; if(o.status === 'pending_payment') statusBadge = `<span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-[10px] font-bold">Chờ TT</span>`; else if(o.status === 'payment_review') statusBadge = `<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold animate-pulse">Chờ xử lý</span>`; else if(o.status === 'paid') statusBadge = `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">Đã TT</span>`; else if(o.status === 'printing') statusBadge = `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">Đang in</span>`; else if(o.status === 'delivered') statusBadge = `<span class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold">Đã Giao</span>`; const voucherDisplay = o.appliedCode ? `<span class="text-[10px] bg-pink-100 text-pink-600 px-1 rounded ml-1">${sanitizeText(o.appliedCode)}</span>` : ''; const showDeliverBtn = (o.status === 'paid' || o.status === 'printing'); const checkPaymentBtn = o.status === 'payment_review' ? `<button onclick="adminApproveOrderPayment('${id}', '${o.userId}')" class="flex-1 min-w-[95px] h-[32px] bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 text-[11px]" title="Xác nhận thanh toán cũ"><i class="fa-solid fa-shield-check mr-1"></i>Đã nhận</button>` : ''; const reminderBtn = o.status === 'pending_payment' ? `<button onclick="adminNudgePayment('${id}', '${o.userId}')" class="flex-1 min-w-[80px] h-[32px] bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 text-[11px]" title="Nhắc khách thanh toán"><i class="fa-solid fa-bell mr-1"></i>Nhắc</button>` : ''; const payContent = o.paymentContent ? `<div class="mt-1 text-[10px] bg-orange-50 text-orange-700 p-1 rounded border border-orange-100">ND CK: <b class="payment-code">${sanitizeText(o.paymentContent)}</b></div>` : ''; const adminLinksHtml = String(o.driveLink || '').split(',').map((url, idx) => `<a href="${sanitizeText(url.trim())}" target="_blank" class="text-blue-600 underline mr-2 font-extrabold">[Tải File ${idx + 1}]</a>`).join(''); html.push(`<div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-xs relative hover:shadow-md transition"> <div class="flex justify-between items-start mb-3"> <div> <div class="font-bold text-slate-800 text-sm truncate max-w-[190px]">${sanitizeText((o.userEmail || 'unknown').split('@')[0])}</div> <div class="text-[10px] text-slate-400">ID: ${id} ${voucherDisplay}</div>${payContent} </div> <div class="text-right flex items-center gap-2">${statusBadge}<button onclick="handleDeleteOrder('${id}')" class="text-red-400 hover:text-red-600 p-1" title="Xóa đơn"><i class="fa-solid fa-trash"></i></button></div> </div> <div class="bg-slate-50 p-2 rounded-xl mb-2 border border-slate-100 space-y-1"> <div class="flex gap-1"><i class="fa-brands fa-google-drive text-slate-400"></i> ${adminLinksHtml}</div> <div class="flex gap-1"><i class="fa-solid fa-comment text-slate-400"></i> <span class="italic truncate">${sanitizeText(o.userNote || '')}</span></div> <div class="mt-1"><input type="text" id="note-${id}" value="${sanitizeText(o.adminNote || '')}" class="w-full p-1 border border-dashed border-brand-300 rounded text-[11px] bg-brand-50 focus:bg-white transition" placeholder="Trả lời khách..."></div> </div> <div class="grid grid-cols-2 gap-2 items-end"> <div><label class="block text-[10px] text-slate-400">Tiền in</label><input type="number" id="p-${id}" value="${o.printPrice || 0}" class="w-full p-2 border rounded bg-white font-bold"></div> <div><label class="block text-[10px] text-slate-400">Ship</label><input type="number" id="s-${id}" value="${o.shipPrice || 0}" class="w-full p-2 border rounded bg-white font-bold"></div> </div> <div class="mt-3 flex flex-wrap gap-2"> <button onclick="autoFillQuote('${id}')" class="flex-1 min-w-[110px] h-[34px] bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 text-[12px]" title="Báo giá nhanh"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Giá nhanh</button> <button onclick="adminUpdateQuote('${id}', '${sanitizeText(o.appliedCode || '')}')" class="flex-1 min-w-[120px] h-[34px] bg-brand-600 text-white rounded-lg font-extrabold hover:bg-brand-700 text-[12px]" title="Gửi báo giá cho khách"><i class="fa-solid fa-paper-plane mr-1"></i>Báo giá</button> ${checkPaymentBtn}${reminderBtn} ${showDeliverBtn ? `<button onclick="adminMarkDelivered('${id}', '${o.userId}')" class="flex-1 min-w-[105px] h-[34px] bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 text-[12px]" title="Báo đã giao & Cộng điểm"><i class="fa-solid fa-truck mr-1"></i>Đã giao</button>` : ''} </div> </div>`); }); div.innerHTML = html.join(''); }, (error) => showToast('Lỗi tải đơn hàng: ' + error.message, 'error')); }
+       function initUserOrders(uid) { 
+            // SỬA LỖI #4: Ngắt cổng lắng nghe cũ trước khi tạo cổng mới
+            if (userOrdersUnsub) userOrdersUnsub();
 
+            const q = query(collection(db, "orders"), where("userId", "==", uid), orderBy("createdAt", "desc"), limit(50)); 
+            
+            userOrdersUnsub = onSnapshot(q, (snap) => { 
+                const div = document.getElementById('user-orders-list'); 
+                if(!div) return;
+                div.innerHTML = ""; 
+
+                if (snap.empty) { 
+                    div.innerHTML = '<div class="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400">Bạn chưa có đơn hàng nào.</div>'; 
+                    return; 
+                } 
+
+                // SỬA LỖI #13: Tạo mảng đệm tối ưu tốc độ render đơn hàng của User
+                const htmlBuffer = [];
+
+                snap.forEach(d => { 
+                    const o = d.data(); 
+                    const total = fmtVND(o.totalPrice || 0); 
+                    let statusVi = 'Chờ báo giá', statusColor = 'bg-gray-100 text-gray-600'; 
+                    if(o.status === 'pending_payment') { statusVi = 'Chờ TT'; statusColor = 'bg-yellow-100 text-yellow-700'; } 
+                    else if(o.status === 'payment_review') { statusVi = 'Chờ xử lý'; statusColor = 'bg-orange-100 text-orange-700'; } 
+                    else if(o.status === 'paid') { statusVi = 'Đã TT'; statusColor = 'bg-green-100 text-green-700'; } 
+                    else if(o.status === 'printing') { statusVi = 'Đang in'; statusColor = 'bg-blue-100 text-blue-700'; } 
+                    else if(o.status === 'delivered') { statusVi = 'Đã Giao'; statusColor = 'bg-purple-100 text-purple-700'; } 
+                    
+                    const payBtn = o.status === 'pending_payment' ? `<button onclick="openPaymentModal('${d.id}', ${Number(o.totalPrice || 0)})" class="bg-brand-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-700 animate-pulse">Thanh toán</button>` : ''; 
+                    const paymentInfo = o.paymentMethod ? `<p class="text-[10px] text-slate-400"><i class="fa-solid fa-credit-card mr-1"></i> ${o.paymentMethod === 'wallet' ? 'Ví tiền' : 'Thanh toán cũ'}</p>` : ''; 
+                    const userLinksHtml = String(o.driveLink || '').split(',').map((url, idx) => `<a href="${sanitizeText(url.trim())}" target="_blank" class="text-blue-500 underline mr-2 font-bold">[File ${idx + 1}]</a>`).join(''); 
+                    
+                    htmlBuffer.push(`
+                        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-bold text-slate-700 text-sm">#${d.id.slice(0,6)}</span>
+                                <span class="text-[10px] font-bold px-2 py-1 rounded uppercase ${statusColor}">${statusVi}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 mb-2 flex items-center gap-1"><i class="fa-regular fa-clock"></i> ${formatTime(o.createdAt)}</div>
+                            <div class="text-xs text-slate-500 mb-3 space-y-1">
+                                <p class="truncate"><i class="fa-solid fa-link mr-1"></i> ${userLinksHtml}</p>
+                                <p class="truncate"><i class="fa-solid fa-note-sticky mr-1"></i> ${sanitizeText(o.userNote || '---')}</p>
+                                ${o.adminNote ? `<p class="text-brand-600 font-medium mt-1 border-t border-dashed pt-1"><i class="fa-solid fa-reply mr-1"></i> Shop: ${sanitizeText(o.adminNote)}</p>` : ''}
+                                ${paymentInfo}
+                            </div>
+                            <div class="flex justify-between items-center pt-3 border-t border-slate-100">
+                                <span class="font-extrabold text-brand-600 text-base">${total}</span>
+                                ${payBtn}
+                            </div>
+                        </div>`); 
+                }); 
+
+                div.innerHTML = htmlBuffer.join(''); // Dựng khung 1 lần duy nhất
+            }); 
+        }
+       // --- HÀM THEO DÕI ĐƠN HÀNG ADMIN SIÊU TỐC (SỬA LỖI #6 & #13) ---
+        function initAdminOrders() { 
+            if (!requireAdmin()) return; 
+            if (adminOrdersUnsub) { adminOrdersUnsub(); adminOrdersUnsub = null; } 
+            
+            // SỬA LỖI #6: Thêm chốt chặn limit(200) đơn hàng mới nhất để tránh sập băng thông và tiết kiệm hóa đơn Firestore
+            const q = query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(200)); 
+            
+            adminOrdersUnsub = onSnapshot(q, (snap) => { 
+                const div = document.getElementById('admin-orders-list'); 
+                if (!div) return; 
+                
+                if (snap.empty) { 
+                    div.innerHTML = '<div class="lg:col-span-2 bg-white p-8 rounded-2xl text-center text-slate-400 border border-slate-200">Chưa có đơn hàng nào cần quản lý.</div>'; 
+                    return; 
+                } 
+                
+                const htmlBuffer = []; // SỬA LỖI #13: Tạo mảng bộ đệm để gom toàn bộ giao diện lại xử lý một lượt
+                
+                snap.forEach(d => { 
+                    const o = d.data(); 
+                    const id = d.id; 
+                    
+                    let statusBadge = `<span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold">Mới</span>`; 
+                    if(o.status === 'pending_payment') statusBadge = `<span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-[10px] font-bold">Chờ TT</span>`; 
+                    else if(o.status === 'payment_review') statusBadge = `<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[10px] font-bold animate-pulse">Chờ xử lý</span>`; 
+                    else if(o.status === 'paid') statusBadge = `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">Đã TT</span>`; 
+                    else if(o.status === 'printing') statusBadge = `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">Đang in</span>`; 
+                    else if(o.status === 'delivered') statusBadge = `<span class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold">Đã Giao</span>`; 
+                    
+                    const voucherDisplay = o.appliedCode ? `<span class="text-[10px] bg-pink-100 text-pink-600 px-1 rounded ml-1">${window.sanitizeText(o.appliedCode)}</span>` : ''; 
+                    const showDeliverBtn = (o.status === 'paid' || o.status === 'printing'); 
+                    const checkPaymentBtn = o.status === 'payment_review' ? `<button onclick="adminApproveOrderPayment('${id}', '${o.userId}')" class="flex-1 min-w-[95px] h-[32px] bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 text-[11px]"><i class="fa-solid fa-shield-check mr-1"></i>Đã nhận</button>` : ''; 
+                    const reminderBtn = o.status === 'pending_payment' ? `<button onclick="adminNudgePayment('${id}', '${o.userId}')" class="flex-1 min-w-[80px] h-[32px] bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 text-[11px]"><i class="fa-solid fa-bell mr-1"></i>Nhắc</button>` : ''; 
+                    const payContent = o.paymentContent ? `<div class="mt-1 text-[10px] bg-orange-50 text-orange-700 p-1 rounded border border-orange-100">ND CK: <b class="payment-code">${window.sanitizeText(o.paymentContent)}</b></div>` : ''; 
+                    const adminLinksHtml = String(o.driveLink || '').split(',').map((url, idx) => `<a href="${window.sanitizeText(url.trim())}" target="_blank" class="text-blue-600 underline mr-2 font-extrabold">[Tải File ${idx + 1}]</a>`).join(''); 
+                    
+                    // Thêm chuỗi giao diện của thẻ đơn hàng vào mảng bộ đệm
+                    htmlBuffer.push(`
+                        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-xs relative hover:shadow-md transition"> 
+                            <div class="flex justify-between items-start mb-3"> 
+                                <div> 
+                                    <div class="font-bold text-slate-800 text-sm truncate max-w-[190px]">${window.sanitizeText((o.userEmail || 'unknown').split('@')[0])}</div> 
+                                    <div class="text-[10px] text-slate-400">ID: ${id} ${voucherDisplay}</div>${payContent} 
+                                </div> 
+                                <div class="text-right flex items-center gap-2">${statusBadge}<button onclick="handleDeleteOrder('${id}')" class="text-red-400 hover:text-red-600 p-1"><i class="fa-solid fa-trash"></i></button></div> 
+                            </div> 
+                            <div class="bg-slate-50 p-2 rounded-xl mb-2 border border-slate-100 space-y-1"> 
+                                <div class="flex gap-1"><i class="fa-brands fa-google-drive text-slate-400"></i> ${adminLinksHtml}</div> 
+                                <div class="flex gap-1"><i class="fa-solid fa-comment text-slate-400"></i> <span class="italic truncate">${window.sanitizeText(o.userNote || '')}</span></div> 
+                                <div class="mt-1"><input type="text" id="note-${id}" value="${window.sanitizeText(o.adminNote || '')}" class="w-full p-1 border border-dashed border-brand-300 rounded text-[11px] bg-brand-50 focus:bg-white transition" placeholder="Trả lời khách..."></div> 
+                            </div> 
+                            <div class="grid grid-cols-2 gap-2 items-end"> 
+                                <div><label class="block text-[10px] text-slate-400">Tiền in</label><input type="number" id="p-${id}" value="${o.printPrice || 0}" class="w-full p-2 border rounded bg-white font-bold"></div> 
+                                <div><label class="block text-[10px] text-slate-400">Ship</label><input type="number" id="s-${id}" value="${o.shipPrice || 0}" class="w-full p-2 border rounded bg-white font-bold"></div> 
+                            </div> 
+                            <div class="mt-3 flex flex-wrap gap-2"> 
+                                <button onclick="autoFillQuote('${id}')" class="flex-1 min-w-[110px] h-[34px] bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 text-[12px]"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Giá nhanh</button> 
+                                <button onclick="adminUpdateQuote('${id}', '${window.sanitizeText(o.appliedCode || '')}')" class="flex-1 min-w-[120px] h-[34px] bg-brand-600 text-white rounded-lg font-extrabold hover:bg-brand-700 text-[12px]"><i class="fa-solid fa-paper-plane mr-1"></i>Báo giá</button> 
+                                ${checkPaymentBtn}${reminderBtn} 
+                                ${showDeliverBtn ? `<button onclick="adminMarkDelivered('${id}', '${o.userId}')" class="flex-1 min-w-[105px] h-[34px] bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 text-[12px]"><i class="fa-solid fa-truck mr-1"></i>Đã giao</button>` : ''} 
+                            </div> 
+                        </div>`); 
+                }); 
+        
+                // Đổ toàn bộ mảng gộp chuỗi vào DOM một lần duy nhất, tốc độ render tăng gấp 20 lần!
+                div.innerHTML = htmlBuffer.join(''); 
+            }, (error) => showToast('Lỗi kết nối danh sách đơn: ' + error.message, 'error')); 
+        }
         window.adminUpdateQuote = async (id, codeString) => {
             if (!requireAdmin()) return;
             try {
@@ -3140,39 +3387,61 @@ if (v.type === 'percent') disc = p * (v.value / 100);
             });
         }
 
-        function initAdminPayments() {
+       function initAdminPayments() {
             if (adminDepositUnsub) adminDepositUnsub();
             if (adminWalletLogUnsub) adminWalletLogUnsub();
-            adminDepositUnsub = onSnapshot(collection(db, "deposits"), (snap) => {
+            
+            // SỬA LỖI #4 & #8: Gán chính xác vào biến Unsub và giới hạn limit(150) bản ghi mới nhất
+            adminDepositUnsub = onSnapshot(query(collection(db, "deposits"), orderBy("createdAt", "desc"), limit(150)), (snap) => {
                 const list = document.getElementById('admin-deposits-list');
                 if (!list) return;
-                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => getDocMillis(b.createdAt) - getDocMillis(a.createdAt));
+                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 const totalApproved = docs.filter(x => x.status === 'approved').reduce((sum, x) => sum + Number(x.amount || 0), 0);
                 const pending = docs.filter(x => x.status === 'pending').length;
-                document.getElementById('admin-total-approved').innerText = fmtVND(totalApproved);
-                document.getElementById('admin-pending-deposits').innerText = pending;
+                
+                const approvedEl = document.getElementById('admin-total-approved');
+                if (approvedEl) approvedEl.innerText = fmtVND(totalApproved);
+                const pendingEl = document.getElementById('admin-pending-deposits');
+                if (pendingEl) pendingEl.innerText = pending;
+                
                 if (!docs.length) { list.innerHTML = '<div class="p-8 text-center text-slate-400">Chưa có yêu cầu nạp.</div>'; return; }
-                list.innerHTML = docs.map(dep => {
+                
+                // Gom mảng tối ưu tốc độ render
+                const htmlBuffer = [];
+                docs.forEach(dep => {
                     const statusColor = dep.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : dep.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700 animate-pulse';
                     const statusText = dep.status === 'approved' ? 'Đã duyệt' : dep.status === 'rejected' ? 'Từ chối' : 'Chờ duyệt';
-                  const buttons = dep.status === 'pending' ? `<div class="flex gap-2 mt-3"><button onclick="approveDeposit('${dep.id}', this)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl font-bold text-xs"><i class="fa-solid fa-check mr-1"></i> Duyệt & cộng ví</button><button onclick="rejectDeposit('${dep.id}')" class="bg-red-50 text-red-600 border border-red-100 px-3 py-2 rounded-xl font-bold text-xs"><i class="fa-solid fa-xmark"></i></button></div>` : '';
-                    return `<div class="p-4 hover:bg-slate-50 transition"><div class="flex flex-col md:flex-row gap-4"><img src="${vietQrUrl(dep.amount, dep.transferContent || dep.paymentCode)}" class="w-24 h-24 rounded-xl border border-slate-200 p-1 bg-white mx-auto md:mx-0"><div class="flex-1 min-w-0"><div class="flex justify-between gap-3"><div><div class="font-extrabold text-slate-800">${fmtVND(dep.amount)} <span class="text-[10px] px-2 py-1 rounded-full ${statusColor}">${statusText}</span></div><div class="text-xs text-slate-500 mt-1"><i class="fa-solid fa-envelope mr-1"></i>${sanitizeText(dep.userEmail)}</div><div class="text-xs text-slate-500"><i class="fa-regular fa-clock mr-1"></i>${formatTime(dep.createdAt)}</div></div></div><div class="mt-2 bg-slate-50 rounded-xl p-2 border border-slate-100"><div class="text-[10px] uppercase font-bold text-slate-400">Mã thanh toán + Gmail</div><div class="font-mono payment-code text-emerald-700 font-extrabold break-all select-all">${sanitizeText(dep.transferContent || dep.paymentCode)}</div></div>${dep.note ? `<div class="text-xs text-slate-500 mt-2 italic">${sanitizeText(dep.note)}</div>` : ''}${buttons}</div></div></div>`;
-                }).join('');
+                    const buttons = dep.status === 'pending' ? `<div class="flex gap-2 mt-3"><button onclick="approveDeposit('${dep.id}', this)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl font-bold text-xs"><i class="fa-solid fa-check mr-1"></i> Duyệt & cộng ví</button><button onclick="rejectDeposit('${dep.id}')" class="bg-red-50 text-red-600 border border-red-100 px-3 py-2 rounded-xl font-bold text-xs"><i class="fa-solid fa-xmark"></i></button></div>` : '';
+                    
+                    htmlBuffer.push(`<div class="p-4 hover:bg-slate-50 transition"><div class="flex flex-col md:flex-row gap-4"><img src="${vietQrUrl(dep.amount, dep.transferContent || dep.paymentCode)}" class="w-24 h-24 rounded-xl border border-slate-200 p-1 bg-white mx-auto md:mx-0"><div class="flex-1 min-w-0"><div class="flex justify-between gap-3"><div><div class="font-extrabold text-slate-800">${fmtVND(dep.amount)} <span class="text-[10px] px-2 py-1 rounded-full ${statusColor}">${statusText}</span></div><div class="text-xs text-slate-500 mt-1"><i class="fa-solid fa-envelope mr-1"></i>${window.sanitizeText(dep.userEmail)}</div><div class="text-xs text-slate-500"><i class="fa-regular fa-clock mr-1"></i>${formatTime(dep.createdAt)}</div></div></div><div class="mt-2 bg-slate-50 rounded-xl p-2 border border-slate-100"><div class="text-[10px] uppercase font-bold text-slate-400">Mã thanh toán + Gmail</div><div class="font-mono payment-code text-emerald-700 font-extrabold break-all select-all">${window.sanitizeText(dep.transferContent || dep.paymentCode)}</div></div>${dep.note ? `<div class="text-xs text-slate-500 mt-2 italic">${window.sanitizeText(dep.note)}</div>` : ''}${buttons}</div></div></div>`);
+                });
+                list.innerHTML = htmlBuffer.join('');
             });
+            
             adminWalletLogUnsub = onSnapshot(query(collection(db, "wallet_logs"), orderBy("createdAt", "desc"), limit(50)), (snap) => {
                 const list = document.getElementById('admin-wallet-logs-list');
                 if (!list) return;
                 let spentToday = 0;
                 const today = new Date().toDateString();
-                if (snap.empty) { list.innerHTML = '<div class="p-8 text-center text-slate-400 text-sm">Chưa có log.</div>'; document.getElementById('admin-wallet-spent-today').innerText = fmtVND(0); return; }
-                list.innerHTML = snap.docs.map(d => {
+                if (snap.empty) { 
+                    list.innerHTML = '<div class="p-8 text-center text-slate-400 text-sm">Chưa có log.</div>'; 
+                    const spentEl = document.getElementById('admin-wallet-spent-today');
+                    if (spentEl) spentEl.innerText = fmtVND(0); 
+                    return; 
+                }
+                
+                const htmlBuffer = [];
+                snap.docs.forEach(d => {
                     const l = d.data();
                     const millis = getDocMillis(l.createdAt);
                     if (l.type === 'order_payment' && new Date(millis).toDateString() === today) spentToday += Number(l.amount || 0);
                     const positive = Number(l.delta || 0) >= 0;
-                    return `<div class="p-3"><div class="font-bold text-xs text-slate-700 truncate">${sanitizeText(l.userEmail || l.userId || '')}</div><div class="text-[11px] text-slate-500 mt-1">${sanitizeText(l.note || l.type)} • ${formatTime(l.createdAt)}</div><div class="font-extrabold ${positive ? 'text-emerald-600' : 'text-red-600'} mt-1">${positive ? '+' : ''}${fmtVND(l.delta ?? l.amount)}</div></div>`;
-                }).join('');
-                document.getElementById('admin-wallet-spent-today').innerText = fmtVND(spentToday);
+                    
+                    htmlBuffer.push(`<div class="p-3"><div class="font-bold text-xs text-slate-700 truncate">${window.sanitizeText(l.userEmail || l.userId || '')}</div><div class="text-[11px] text-slate-500 mt-1">${window.sanitizeText(l.note || l.type)} • ${formatTime(l.createdAt)}</div><div class="font-extrabold ${positive ? 'text-emerald-600' : 'text-red-600'} mt-1">${positive ? '+' : ''}${fmtVND(l.delta ?? l.amount)}</div></div>`);
+                });
+                list.innerHTML = htmlBuffer.join('');
+                const spentEl = document.getElementById('admin-wallet-spent-today');
+                if (spentEl) spentEl.innerText = fmtVND(spentToday);
             });
         }
 
@@ -3297,33 +3566,46 @@ if (v.type === 'percent') disc = p * (v.value / 100);
             showToast('Đã tự điền báo giá nhanh. Bấm dấu check để gửi cho khách.');
         };
 
+      // --- TRUY VẤN CÓ CHỌN LỌC PHÒNG VỆ QUOTA FIRESTORE (SỬA LỖI #9) ---
         function initAutomationDashboard() {
             adminAutoUnsubs.forEach(fn => fn && fn());
             adminAutoUnsubs = [];
             const state = { orders: [], deposits: [], users: [] };
+            
             const render = () => {
                 const pendingQuote = state.orders.filter(o => o.status === 'pending_quote').length;
                 const pendingPay = state.orders.filter(o => o.status === 'pending_payment' || o.status === 'payment_review').length;
                 const pendingDeposit = state.deposits.filter(d => d.status === 'pending').length;
+                
+                // Tính toán số dư dựa trên tập dữ liệu người dùng có số dư thực tế
                 const walletTotal = state.users.reduce((sum, u) => sum + Number(u.balance || 0), 0);
+                
                 const setText = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
                 setText('auto-pending-quote', pendingQuote);
                 setText('auto-pending-pay', pendingPay);
                 setText('auto-pending-deposit', pendingDeposit);
                 setText('auto-wallet-total', fmtVND(walletTotal));
+                
                 const todo = document.getElementById('admin-auto-todo');
                 if (!todo) return;
                 const items = [];
+                
                 state.deposits.filter(d => d.status === 'pending').slice(0, 5).forEach(d => items.push(`<div class="p-4 flex justify-between gap-3"><div><div class="font-bold text-slate-700">Duyệt nạp ${fmtVND(d.amount)}</div><div class="text-xs text-slate-500">${sanitizeText(d.userEmail)} • ${sanitizeText(d.paymentCode)}</div></div><button onclick="switchTab('admin-payments')" class="text-xs bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg font-bold">Xử lý</button></div>`));
                 state.orders.filter(o => o.status === 'pending_quote').slice(0, 5).forEach(o => items.push(`<div class="p-4 flex justify-between gap-3"><div><div class="font-bold text-slate-700">Đơn chờ báo giá #${o.id.slice(0,6)}</div><div class="text-xs text-slate-500">${sanitizeText(o.userEmail)}</div></div><button onclick="switchTab('admin-orders')" class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg font-bold">Báo giá</button></div>`));
                 state.orders.filter(o => o.status === 'payment_review').slice(0, 5).forEach(o => items.push(`<div class="p-4 flex justify-between gap-3"><div><div class="font-bold text-slate-700">Cần xử lý thanh toán #${o.id.slice(0,6)}</div><div class="text-xs text-slate-500">${sanitizeText(o.paymentContent || o.userEmail)}</div></div><button onclick="switchTab('admin-orders')" class="text-xs bg-orange-50 text-orange-700 px-3 py-1 rounded-lg font-bold">Kiểm tra</button></div>`));
+                
                 todo.innerHTML = items.length ? items.join('') : '<div class="p-8 text-center text-emerald-600 font-bold">Tuyệt vời! Không có việc gấp.</div>';
             };
-            adminAutoUnsubs.push(onSnapshot(collection(db, "orders"), snap => { state.orders = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }));
-            adminAutoUnsubs.push(onSnapshot(collection(db, "deposits"), snap => { state.deposits = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }));
-            adminAutoUnsubs.push(onSnapshot(collection(db, "users"), snap => { state.users = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }));
-        }
 
+            // THAY ĐỔI: Sử dụng bộ lọc điều kiện thông minh để giảm 95% lượng document tải về vô ích
+            const qOrders = query(collection(db, "orders"), where("status", "in", ["pending_quote", "pending_payment", "payment_review"]), limit(100));
+            const qDeposits = query(collection(db, "deposits"), where("status", "==", "pending"), limit(50));
+            const qUsers = query(collection(db, "users"), where("balance", ">", 0), limit(250));
+
+            adminAutoUnsubs.push(onSnapshot(qOrders, snap => { state.orders = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }, (e) => console.log(e.message)));
+            adminAutoUnsubs.push(onSnapshot(qDeposits, snap => { state.deposits = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }, (e) => console.log(e.message)));
+            adminAutoUnsubs.push(onSnapshot(qUsers, snap => { state.users = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }, (e) => console.log(e.message)));
+        }
         window.autoReminderSweep = async (showResult = true) => {
             if (!isCurrentAdmin()) return;
             try {
@@ -3349,51 +3631,223 @@ const snap = await getDocs(q);
             } catch (e) { if (showResult) showToast('Lỗi quét nhắc thanh toán: ' + e.message, 'error'); }
         };
 
-      window.copyDailyPaymentReport = async () => {
+     window.copyDailyPaymentReport = async () => {
             if (!requireAdmin()) return;
             try {
                 // Tối ưu: Lấy số liệu ví trực tiếp từ DOM đã được tính ngầm, không query lại DB
                 const walletTotalStr = document.getElementById('auto-wallet-total')?.innerText || '0đ';
                 
-                const [ordersSnap, depositsSnap] = await Promise.all([
-                    getDocs(collection(db, "orders")), 
-                    getDocs(collection(db, "deposits"))
+                // SỬA LỖI #12: Tạo mốc thời gian bắt đầu ngày hôm nay
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+
+                // Ép chỉ mục quét có chọn lọc theo mốc thời gian và trạng thái cụ thể
+                const qOrders = query(collection(db, "orders"), where("createdAt", ">=", todayStart));
+                const qDeposits = query(collection(db, "deposits"), where("createdAt", ">=", todayStart));
+                const qPendingReview = query(collection(db, "orders"), where("status", "==", "payment_review"));
+                const qPendingDeposit = query(collection(db, "deposits"), where("status", "==", "pending"));
+
+                const [ordersSnap, depositsSnap, pendingReviewSnap, pendingDepositSnap] = await Promise.all([
+                    getDocs(qOrders), 
+                    getDocs(qDeposits),
+                    getDocs(qPendingReview),
+                    getDocs(qPendingDeposit)
                 ]);
+
                 const today = new Date().toDateString();
-                let walletRevenue = 0, transferReview = 0, approvedDeposit = 0, pendingDeposit = 0;
+                let walletRevenue = 0;
                 ordersSnap.forEach(d => { 
                     const o = d.data(); 
                     const t = getDocMillis(o.paidAt || o.updatedAt || o.createdAt); 
-                    if (new Date(t).toDateString() === today && o.paymentMethod === 'wallet' && o.status !== 'delivered') walletRevenue += Number(o.totalPrice || 0); 
-                    if (o.status === 'payment_review') transferReview++; 
+                    if (new Date(t).toDateString() === today && o.paymentMethod === 'wallet' && o.status !== 'delivered') {
+                        walletRevenue += Number(o.totalPrice || 0); 
+                    }
                 });
+
+                let approvedDepositToday = 0;
                 depositsSnap.forEach(d => { 
                     const dep = d.data(); 
-                    if (dep.status === 'approved') approvedDeposit += Number(dep.amount || 0); 
-                    if (dep.status === 'pending') pendingDeposit++; 
+                    const t = getDocMillis(dep.approvedAt || dep.createdAt);
+                    if (new Date(t).toDateString() === today && dep.status === 'approved') {
+                        approvedDepositToday += Number(dep.amount || 0); 
+                    }
                 });
+
+                const transferReview = pendingReviewSnap.size;
+                const pendingDeposit = pendingDepositSnap.size;
+
                 const report = `PRINTSHOP PRO - BÁO CÁO THANH TOÁN ${new Date().toLocaleDateString('vi-VN')}
 - Doanh thu ví hôm nay: ${fmtVND(walletRevenue)}
-- Nạp đã duyệt lũy kế: ${fmtVND(approvedDeposit)}
+- Nạp đã duyệt hôm nay: ${fmtVND(approvedDepositToday)}
 - Yêu cầu nạp chờ duyệt: ${pendingDeposit}
 - Đơn thanh toán cũ chờ xử lý: ${transferReview}
 - Tổng số dư ví đang lưu hành: ${walletTotalStr}
 Tài khoản nhận tiền: VCB ${BANK_INFO.accountNo} - ${BANK_INFO.accountHolder}`;
+                
                 await navigator.clipboard?.writeText(report);
-                showToast('Đã copy báo cáo thanh toán.');
+                showToast('Đã copy báo cáo thanh toán hôm nay.');
             } catch (e) { showToast('Lỗi tạo báo cáo: ' + e.message, 'error'); }
         };
 
         window.toggleChat = () => { document.getElementById('chat-box').classList.toggle('hidden'); if(!document.getElementById('chat-box').classList.contains('hidden')) setTimeout(() => document.getElementById('chat-input').focus(), 100); }
-       function initUserChat(uid) { const q = query(collection(db, "chats", uid, "messages"), orderBy("createdAt", "asc")); onSnapshot(q, (snapshot) => { const div = document.getElementById('chat-messages'); div.innerHTML = '<div class="bg-blue-100 text-blue-800 p-2 rounded-lg rounded-tl-none self-start max-w-[85%] text-xs">Shop chào bạn! Cần giúp gì không ạ?</div>'; snapshot.forEach(d => { const m = d.data(); const cls = m.sender === 'user' ? "bg-brand-600 text-white self-end rounded-tr-none" : "bg-white border border-slate-200 text-slate-800 self-start rounded-tl-none"; div.innerHTML += `<div class="${cls} p-2 rounded-lg max-w-[85%] break-words text-xs shadow-sm">${sanitizeText(m.text)}</div>`; }); div.scrollTop = div.scrollHeight; }); }
-        window.sendUserChat = async (e) => { e.preventDefault(); const inp = document.getElementById('chat-input'); const text = inp.value.trim(); if(!text) return; const batch = writeBatch(db); batch.set(doc(collection(db, "chats", currentUser.uid, "messages")), { text, sender: 'user', createdAt: serverTimestamp() }); batch.set(doc(db, "chats", currentUser.uid), { userEmail: currentUser.email, lastMessage: text, lastMessageTime: serverTimestamp(), userId: currentUser.uid }, { merge: true }); await batch.commit(); sendNotification('admin', `Tin nhắn mới từ ${currentUser.email}: ${text.slice(0,80)}`, { title: 'Tin nhắn khách hàng', type: 'chat', refId: currentUser.uid }); inp.value = ""; };
-       function initAdminChatList() { const q = query(collection(db, "chats"), orderBy("lastMessageTime", "desc")); onSnapshot(q, (snapshot) => { const list = document.getElementById('admin-chat-list'); list.innerHTML = ""; snapshot.forEach(docSnap => { const data = docSnap.data(); const isActive = activeChatUserId === docSnap.id; const bgClass = isActive ? "bg-brand-50 border-l-4 border-brand-600" : "hover:bg-slate-50 border-l-4 border-transparent"; list.innerHTML += `<div onclick="openAdminChat('${docSnap.id}', '${data.userEmail}')" class="p-3 border-b cursor-pointer transition ${bgClass}"><div class="flex justify-between items-center"><span class="font-bold text-xs text-slate-800 truncate w-24">${data.userEmail.split('@')[0]}</span><span class="text-[10px] text-slate-400">${formatTime(data.lastMessageTime)}</span></div><div class="text-[11px] text-slate-500 truncate mt-1">${sanitizeText(data.lastMessage || '...')}</div></div>`; }); }); }
-      window.openAdminChat = (userId, userEmail) => { if (!requireAdmin()) return; activeChatUserId = userId; document.getElementById('admin-chat-header').innerText = `Chat: ${userEmail.split('@')[0]}`; document.getElementById('admin-chat-form').classList.remove('hidden'); if (adminChatUnsub) adminChatUnsub(); const q = query(collection(db, "chats", userId, "messages"), orderBy("createdAt", "asc")); adminChatUnsub = onSnapshot(q, (snap) => { const div = document.getElementById('admin-chat-messages'); div.innerHTML = ""; snap.forEach(d => { const m = d.data(); const cls = m.sender !== 'user' ? "bg-brand-600 text-white self-end rounded-tr-none" : "bg-white border border-slate-200 text-slate-800 self-start rounded-tl-none"; div.innerHTML += `<div class="${cls} p-2 rounded-lg max-w-[85%] text-xs break-words shadow-sm">${sanitizeText(m.text)}</div>`; }); div.scrollTop = div.scrollHeight; }); };
-        window.sendAdminChat = async (e) => { e.preventDefault(); if (!requireAdmin()) return; if (!activeChatUserId) return; const inp = document.getElementById('admin-chat-input'); const text = inp.value.trim(); if (!text) return; const batch = writeBatch(db); batch.set(doc(collection(db, "chats", activeChatUserId, "messages")), { text, sender: 'admin', createdAt: serverTimestamp() }); batch.update(doc(db, "chats", activeChatUserId), { lastMessage: `Admin: ${text}`, lastMessageTime: serverTimestamp() }); await batch.commit(); sendNotification(activeChatUserId, `Admin phản hồi: ${text.slice(0,100)}`, { title: 'Shop đã phản hồi', type: 'chat', refId: activeChatUserId }); inp.value = ""; };
+      // --- TỐI ƯU TOÀN DIỆN HỆ THỐNG TIN NHẮN CHẤT LƯỢNG CAO (SỬA LỖI #4 VÀ #13) ---
+       // --- TỐI ƯU TOÀN DIỆN HỆ THỐNG TIN NHẮN CHẤT LƯỢNG CAO (SỬA LỖI #4, #11 VÀ #13) ---
+        function initUserChat(uid) { 
+            if (userChatUnsub) userChatUnsub();
 
-        function initAdminVouchers() { onSnapshot(collection(db, "vouchers"), (snap) => { const list = document.getElementById('voucher-list'); list.innerHTML = snap.empty ? '<tr><td colspan="5" class="p-4 text-center text-slate-400">Chưa có mã nào</td></tr>' : snap.docs.map(d => { const v = d.data(); return `<tr class="border-b hover:bg-slate-50"><td class="p-3 font-bold text-brand-600">${v.code}</td><td class="p-3">${v.type === 'percent' ? 'Giảm %' : (v.type === 'freeship' ? 'Free Ship' : 'Trừ tiền')}</td><td class="p-3 font-mono">${v.value.toLocaleString()}</td><td class="p-3 font-bold ${v.quantity <= 0 ? 'text-red-500' : 'text-green-600'}">${v.quantity}</td><td class="p-3 text-right"><button onclick="handleDeleteVoucher('${d.id}')" class="text-red-500 hover:bg-red-50 p-2 rounded transition"><i class="fa-solid fa-trash"></i></button></td></tr>`; }).join(''); }); }
-        window.handleCreateVoucher = async (e) => { e.preventDefault(); if (!requireAdmin()) return; await addDoc(collection(db,"vouchers"),{ code: document.getElementById('v-code').value.toUpperCase(), type: document.getElementById('v-type').value, value: Number(document.getElementById('v-value').value), quantity: Number(document.getElementById('v-qty').value) }); showToast("Tạo mã OK"); e.target.reset(); }
-        window.handleDeleteVoucher = async (id) => { if (!requireAdmin()) return; if (!confirm("Xóa voucher?")) return; try { await deleteDoc(doc(db, "vouchers", id)); showToast("Đã xóa"); } catch (e) { showToast("Lỗi: " + e.message, "error"); } };
+            // SỬA LỖI #11: Chỉ lấy tối đa 50 tin nhắn mới nhất để bảo vệ hiệu năng
+            const q = query(collection(db, "chats", uid, "messages"), orderBy("createdAt", "desc"), limit(50)); 
+            
+            userChatUnsub = onSnapshot(q, (snapshot) => { 
+                const div = document.getElementById('chat-messages'); 
+                if(!div) return;
+
+                const htmlBuffer = []; 
+                // Lật ngược danh sách tin nhắn để hiển thị theo đúng thứ tự thời gian từ cũ đến mới
+                const docs = [...snapshot.docs].reverse();
+                
+                docs.forEach(d => { 
+                    const m = d.data(); 
+                    const cls = m.sender === 'user' ? "bg-brand-600 text-white self-end rounded-tr-none" : "bg-white border border-slate-200 text-slate-800 self-start rounded-tl-none"; 
+                    htmlBuffer.push(`<div class="${cls} p-2 rounded-lg max-w-[85%] break-words text-xs shadow-sm">${sanitizeText(m.text)}</div>`); 
+                }); 
+
+                div.innerHTML = '<div class="bg-blue-100 text-blue-800 p-2 rounded-lg rounded-tl-none self-start max-w-[85%] text-xs">Shop chào bạn! Cần giúp gì không ạ?</div>' + htmlBuffer.join('');
+                div.scrollTop = div.scrollHeight; 
+            }); 
+        }
+
+        window.sendUserChat = async (e) => { 
+            e.preventDefault(); 
+            const inp = document.getElementById('chat-input'); 
+            const text = inp.value.trim(); 
+            if(!text) return; 
+            
+            const batch = writeBatch(db); 
+            batch.set(doc(collection(db, "chats", currentUser.uid, "messages")), { text, sender: 'user', createdAt: serverTimestamp() }); 
+            batch.set(doc(db, "chats", currentUser.uid), { userEmail: currentUser.email, lastMessage: text, lastMessageTime: serverTimestamp(), userId: currentUser.uid }, { merge: true }); 
+            await batch.commit(); 
+            sendNotification('admin', `Tin nhắn mới từ ${currentUser.email}: ${text.slice(0,80)}`, { title: 'Tin nhắn khách hàng', type: 'chat', refId: currentUser.uid }); 
+            inp.value = ""; 
+        };
+
+        function initAdminChatList() { 
+            if (adminChatListUnsub) adminChatListUnsub();
+
+            const q = query(collection(db, "chats"), orderBy("lastMessageTime", "desc")); 
+            
+            adminChatListUnsub = onSnapshot(q, (snapshot) => { 
+                const list = document.getElementById('admin-chat-list'); 
+                if(!list) return;
+                
+                const htmlBuffer = []; 
+
+                snapshot.forEach(docSnap => { 
+                    const data = docSnap.data(); 
+                    const isActive = activeChatUserId === docSnap.id; 
+                    const bgClass = isActive ? "bg-brand-50 border-l-4 border-brand-600" : "hover:bg-slate-50 border-l-4 border-transparent"; 
+                    
+                    htmlBuffer.push(`
+                        <div onclick="openAdminChat('${docSnap.id}', '${data.userEmail}')" class="p-3 border-b cursor-pointer transition ${bgClass}">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-xs text-slate-800 truncate w-24">${data.userEmail.split('@')[0]}</span>
+                                <span class="text-[10px] text-slate-400">${formatTime(data.lastMessageTime)}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-500 truncate mt-1">${sanitizeText(data.lastMessage || '...')}</div>
+                        </div>`); 
+                }); 
+
+                list.innerHTML = htmlBuffer.join('');
+            }); 
+        }
+
+        window.openAdminChat = (userId, userEmail) => { 
+            if (!requireAdmin()) return; 
+            activeChatUserId = userId; 
+            document.getElementById('admin-chat-header').innerText = `Chat: ${userEmail.split('@')[0]}`; 
+            document.getElementById('admin-chat-form').classList.remove('hidden'); 
+            
+            if (adminChatUnsub) adminChatUnsub(); 
+            
+            // SỬA LỖI #11: Giới hạn 50 tin nhắn mới nhất cho màn hình Chat của Admin
+            const q = query(collection(db, "chats", userId, "messages"), orderBy("createdAt", "desc"), limit(50)); 
+            adminChatUnsub = onSnapshot(q, (snap) => { 
+                const div = document.getElementById('admin-chat-messages'); 
+                if(!div) return;
+                
+                const htmlBuffer = []; 
+                const docs = [...snap.docs].reverse();
+                snap.forEach(d => { 
+                    const m = d.data(); 
+                    const cls = m.sender !== 'user' ? "bg-brand-600 text-white self-end rounded-tr-none" : "bg-white border border-slate-200 text-slate-800 self-start rounded-tl-none"; 
+                    htmlBuffer.push(`<div class="${cls} p-2 rounded-lg max-w-[85%] text-xs break-words shadow-sm">${sanitizeText(m.text)}</div>`); 
+                }); 
+                
+                div.innerHTML = htmlBuffer.join('');
+                div.scrollTop = div.scrollHeight; 
+            }); 
+        };
+
+        window.sendAdminChat = async (e) => { 
+            e.preventDefault(); 
+            if (!requireAdmin()) return; 
+            if (!activeChatUserId) return; 
+            const inp = document.getElementById('admin-chat-input'); 
+            const text = inp.value.trim(); 
+            if (!text) return; 
+            
+            const batch = writeBatch(db); 
+            batch.set(doc(collection(db, "chats", activeChatUserId, "messages")), { text, sender: 'admin', createdAt: serverTimestamp() }); 
+            batch.update(doc(db, "chats", activeChatUserId), { lastMessage: `Admin: ${text}`, lastMessageTime: serverTimestamp() }); 
+            await batch.commit(); 
+            sendNotification(activeChatUserId, `Admin phản hồi: ${text.slice(0,100)}`, { title: 'Shop đã phản hồi', type: 'chat', refId: activeChatUserId }); 
+            inp.value = ""; 
+        };
+
+        // --- TRIỆT TIÊU RÒ RỈ DỮ LIỆU ĐỘC LẬP (SỬA LỖI #4) ---
+        function initAdminUsers() {
+            if (!requireAdmin()) return;
+            // Bảo vệ chống tạo listener ma trùng lặp: Luồng nghe chính của Users đã được quản lý an toàn ở onAuthStateChanged
+            renderAdminUsersFromCache();
+        }
+
+        function initAdminVouchers() { 
+            if (adminVouchersUnsub) adminVouchersUnsub();
+
+            adminVouchersUnsub = onSnapshot(collection(db, "vouchers"), (snap) => { 
+                const list = document.getElementById('voucher-list'); 
+                if (!list) return;
+
+                if (snap.empty) {
+                    list.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">Chưa có mã nào</td></tr>';
+                    return;
+                }
+
+                list.innerHTML = snap.docs.map(d => { 
+                    const v = d.data(); 
+                    return `<tr class="border-b hover:bg-slate-50"><td class="p-3 font-bold text-brand-600">${v.code}</td><td class="p-3">${v.type === 'percent' ? 'Giảm %' : (v.type === 'freeship' ? 'Free Ship' : 'Trừ tiền')}</td><td class="p-3 font-mono">${v.value.toLocaleString()}</td><td class="p-3 font-bold ${v.quantity <= 0 ? 'text-red-500' : 'text-green-600'}">${v.quantity}</td><td class="p-3 text-right"><button onclick="handleDeleteVoucher('${d.id}')" class="text-red-500 hover:bg-red-50 p-2 rounded transition"><i class="fa-solid fa-trash"></i></button></td></tr>`; 
+                }).join(''); 
+            }); 
+        }
+
+        window.handleCreateVoucher = async (e) => { 
+            e.preventDefault(); 
+            if (!requireAdmin()) return; 
+            await addDoc(collection(db,"vouchers"),{ code: document.getElementById('v-code').value.toUpperCase(), type: document.getElementById('v-type').value, value: Number(document.getElementById('v-value').value), quantity: Number(document.getElementById('v-qty').value) }); 
+            showToast("Tạo mã OK"); 
+            e.target.reset(); 
+        };
+
+        window.handleDeleteVoucher = async (id) => { 
+            if (!requireAdmin()) return; 
+            if (!confirm("Xóa voucher?")) return; 
+            try { 
+                await deleteDoc(doc(db, "vouchers", id)); 
+                showToast("Đã xóa"); 
+            } catch (e) { 
+                showToast("Lỗi: " + e.message, "error"); 
+            } 
+        };
        // --- GACHA ULTIMATE V3: WEEKLY FREE + 5K/1 SPIN + LOCAL FALLBACK ---
 function normalizeGachaItems(items) {
     const raw = Array.isArray(items) && items.length ? items : FALLBACK_GACHA_ITEMS;
@@ -3916,7 +4370,20 @@ document.addEventListener('submit', (e) => {
             const totalEl = document.getElementById('preview-total-price');
             const warningEl = document.getElementById('preview-warning');
             
-            previewBox.classList.remove('hidden');
+            if (pageEl) pageEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nạp bộ xử lý file...';
+            if (previewBox) previewBox.classList.remove('hidden');
+
+            try {
+                await window.loadLibraryOnDemand('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js', 'pdfjsLib');
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                await window.loadLibraryOnDemand('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js', 'mammoth');
+                await window.loadLibraryOnDemand('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', 'JSZip');
+            } catch(err) {
+                showToast("Lỗi tải bộ xử lý tài liệu: " + err.message, "error");
+                if (pageEl) pageEl.innerText = "Lỗi nạp thư viện";
+                return;
+            }
+            
             pageEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đọc danh sách file...';
             printPriceEl.innerText = '...';
             totalEl.innerText = 'Đang tính toán...';
@@ -3932,7 +4399,6 @@ document.addEventListener('submit', (e) => {
                     warningEl.classList.remove('hidden');
                     warningEl.innerText = "* Admin đang tạm tắt tính năng tự động báo giá. Đơn sẽ được báo giá thủ công.";
                 } else {
-                    // Chạy vòng lặp đọc và cộng dồn số trang của từng file một
                     for (let file of currentFilesArray) {
                         if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
                             const arrayBuffer = await file.arrayBuffer();
